@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stockwise_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stockwise_user
+      POSTGRES_PASSWORD: stockwise_password
+      POSTGRES_DB: stockwise
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockwise_user -d stockwise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local

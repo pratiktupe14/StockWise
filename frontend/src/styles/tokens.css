@@ -1,0 +1,40 @@
+/* StockWise Design Tokens */
+:root {
+  --color-bg-page: #F7F8FA;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-subtle: #F8FAFC;
+  
+  --color-text-primary: #172033;
+  --color-text-secondary: #667085;
+  --color-text-muted: #94A3B8;
+  
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: #EFF6FF;
+  --color-primary-border: #BFDBFE;
+  
+  --color-border: #E5E7EB;
+  --color-border-subtle: #F1F5F9;
+  --color-border-strong: #D1D5DB;
+  
+  /* Status indicators */
+  --color-success: #16A34A;
+  --color-success-bg: #DCFCE7;
+  --color-success-text: #166534;
+  --color-success-border: #BBF7D0;
+  
+  --color-warning: #D97706;
+  --color-warning-bg: #FEF3C7;
+  --color-warning-text: #92400E;
+  --color-warning-border: #FDE68A;
+  
+  --color-critical: #DC2626;
+  --color-critical-bg: #FEE2E2;
+  --color-critical-text: #991B1B;
+  --color-critical-border: #FECACA;
+
+  --color-neutral: #64748B;
+  --color-neutral-bg: #F1F5F9;
+  --color-neutral-text: #475569;
+  --color-neutral-border: #E2E8F0;
+}
