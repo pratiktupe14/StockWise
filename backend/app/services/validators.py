@@ -38,10 +38,13 @@ def validate_and_parse_float(
     row_index: int,
     allow_negative: bool = False,
     default: Optional[float] = None,
+    required: bool = True,
 ) -> Tuple[Optional[float], Optional[ValidationError]]:
     if value is None or str(value).strip() == "":
         if default is not None:
             return default, None
+        if not required:
+            return None, None
         return None, ValidationError(
             row_index=row_index,
             field_name=field_name,
@@ -278,6 +281,39 @@ def validate_organizations_dataset(
     return valid_records, errors
 
 
+VALID_LOCATION_TYPES: Set[str] = {
+    "manufacturing_plant",
+    "central_warehouse",
+    "company_warehouse",
+    "regional_warehouse",
+    "cnf_facility",
+    "3pl_facility",
+    "distributor_warehouse",
+    "retail_destination",
+}
+
+LOCATION_TYPE_ALIASES: Dict[str, str] = {
+    "plant": "manufacturing_plant",
+    "factory": "manufacturing_plant",
+    "manufacturing": "manufacturing_plant",
+    "central_dc": "central_warehouse",
+    "cdc": "central_warehouse",
+    "company_dc": "company_warehouse",
+    "regional_dc": "regional_warehouse",
+    "rdc": "regional_warehouse",
+    "cnf": "cnf_facility",
+    "c&f": "cnf_facility",
+    "3pl": "3pl_facility",
+    "distributor": "distributor_warehouse",
+    "distributor_hub": "distributor_warehouse",
+    "retailer": "retail_destination",
+    "retail": "retail_destination",
+    "retail_store": "retail_destination",
+    "store": "retail_destination",
+    "warehouse": "company_warehouse",
+}
+
+
 def validate_locations_dataset(
     rows: List[Dict[str, Any]],
     db: Session,
@@ -286,19 +322,95 @@ def validate_locations_dataset(
     errors: List[ValidationError] = []
     seen_locations: Set[str] = set()
 
+    if not rows:
+        return valid_records, errors
+
+    # Check header-level presence of required columns across uploaded dataset
+    file_headers = {k.strip().lower() for k in rows[0].keys() if k != "_row_num"}
+
+    # Canonical required fields and their supported column aliases
+    has_region = any(h in file_headers for h in ["region", "location_region", "zone", "territory"])
+    has_loc_id = any(h in file_headers for h in ["location_id", "id", "facility_id", "loc_id"])
+    has_name = any(h in file_headers for h in ["name", "location_name", "facility_name"])
+    has_type = any(h in file_headers for h in ["location_type", "type", "facility_type"])
+
+    EXPECTED_HEADERS_HELP = (
+        "Expected canonical headers: location_id, name, location_type, region, city, address, "
+        "owner_org_id, operator_org_id, storage_capacity_units, dispatch_capacity_daily, is_active. "
+        "Download the official template via GET /api/imports/templates/locations."
+    )
+
+    if not has_region:
+        errors.append(ValidationError(
+            row_index=1,
+            field_name="region",
+            rejected_value=None,
+            error_reason=f"Missing required column 'region'. The uploaded file header does not contain the 'region' column. {EXPECTED_HEADERS_HELP}",
+            error_code="MISSING_COLUMN",
+        ))
+    if not has_loc_id:
+        errors.append(ValidationError(
+            row_index=1,
+            field_name="location_id",
+            rejected_value=None,
+            error_reason=f"Missing required column 'location_id'. {EXPECTED_HEADERS_HELP}",
+            error_code="MISSING_COLUMN",
+        ))
+    if not has_name:
+        errors.append(ValidationError(
+            row_index=1,
+            field_name="name",
+            rejected_value=None,
+            error_reason=f"Missing required column 'name'. {EXPECTED_HEADERS_HELP}",
+            error_code="MISSING_COLUMN",
+        ))
+    if not has_type:
+        errors.append(ValidationError(
+            row_index=1,
+            field_name="location_type",
+            rejected_value=None,
+            error_reason=f"Missing required column 'location_type'. {EXPECTED_HEADERS_HELP}",
+            error_code="MISSING_COLUMN",
+        ))
+
+    # If any required column is completely missing from the file header, quarantine immediately
+    if errors:
+        return [], errors
+
     # Pre-fetch existing valid Organizations for referential integrity
     existing_orgs = set(org for (org,) in db.query(Organization.org_id).all())
 
     for row in rows:
         row_num = row.get("_row_num", 0)
-        location_id = (row.get("location_id") or row.get("id") or "").strip()
-        name = (row.get("name") or row.get("location_name") or "").strip()
-        location_type = (row.get("location_type") or row.get("type") or "").strip().lower()
-        region = (row.get("region") or "").strip()
-        city = (row.get("city") or "").strip() or None
-        address = (row.get("address") or "").strip() or None
-        owner_org_id = (row.get("owner_org_id") or "").strip() or None
-        operator_org_id = (row.get("operator_org_id") or "").strip() or None
+        location_id = (
+            row.get("location_id") or row.get("id") or row.get("facility_id") or row.get("loc_id") or ""
+        ).strip()
+        name = (
+            row.get("name") or row.get("location_name") or row.get("facility_name") or ""
+        ).strip()
+        raw_type = (
+            row.get("location_type") or row.get("type") or row.get("facility_type") or ""
+        ).strip().lower()
+
+        # Safely extract region with supported aliases (state is NOT an alias for region)
+        region = (
+            row.get("region")
+            or row.get("location_region")
+            or row.get("zone")
+            or row.get("territory")
+            or ""
+        ).strip()
+
+        city = (row.get("city") or row.get("town") or row.get("district") or "").strip() or None
+        raw_address = (row.get("address") or row.get("street_address") or row.get("location_address") or "").strip() or None
+        raw_state = (row.get("state") or row.get("province") or "").strip()
+        if not raw_address and raw_state:
+            address = f"{city}, {raw_state}" if city else raw_state
+        else:
+            address = raw_address
+
+        owner_org_id = (row.get("owner_org_id") or row.get("owner_org") or row.get("owner_id") or "").strip() or None
+        operator_org_id = (row.get("operator_org_id") or row.get("operator_org") or row.get("operator_id") or "").strip() or None
 
         row_errors: List[ValidationError] = []
 
@@ -312,21 +424,32 @@ def validate_locations_dataset(
         if not name:
             row_errors.append(ValidationError(row_num, "name", name, "Location name is required.", "MISSING_FIELD"))
 
-        if not location_type:
-            row_errors.append(ValidationError(row_num, "location_type", location_type, "Location type is required.", "MISSING_FIELD"))
+        # Location type normalization and validation
+        if not raw_type:
+            row_errors.append(ValidationError(row_num, "location_type", raw_type, "Location type is required.", "MISSING_FIELD"))
+            normalized_type = raw_type
+        else:
+            normalized_type = LOCATION_TYPE_ALIASES.get(raw_type, raw_type)
+            if normalized_type not in VALID_LOCATION_TYPES:
+                row_errors.append(ValidationError(
+                    row_num, "location_type", raw_type,
+                    f"Invalid location type '{raw_type}'. Allowed types: {', '.join(sorted(VALID_LOCATION_TYPES))}.",
+                    "INVALID_LOCATION_TYPE",
+                ))
 
+        # Region validation: row-level MISSING_FIELD when blank
         if not region:
             row_errors.append(ValidationError(row_num, "region", region, "Location region is required.", "MISSING_FIELD"))
 
         # Check organization references if provided
-        if owner_org_id and owner_org_id not in existing_orgs:
+        if owner_org_id and existing_orgs and owner_org_id not in existing_orgs:
             row_errors.append(ValidationError(
                 row_num, "owner_org_id", owner_org_id,
                 f"Unknown Owning Organization '{owner_org_id}'. Organization master record does not exist.",
                 "UNKNOWN_ORGANIZATION"
             ))
 
-        if operator_org_id and operator_org_id not in existing_orgs:
+        if operator_org_id and existing_orgs and operator_org_id not in existing_orgs:
             row_errors.append(ValidationError(
                 row_num, "operator_org_id", operator_org_id,
                 f"Unknown Operating Organization '{operator_org_id}'. Organization master record does not exist.",
@@ -334,23 +457,25 @@ def validate_locations_dataset(
             ))
 
         storage_cap, sc_err = validate_and_parse_float(
-            row.get("storage_capacity_units") or row.get("storage_capacity"),
+            row.get("storage_capacity_units") or row.get("storage_capacity") or row.get("capacity_units"),
             "storage_capacity_units",
             row_num,
             allow_negative=False,
             default=None,
+            required=False,
         )
-        if sc_err and row.get("storage_capacity_units") not in [None, ""]:
+        if sc_err:
             row_errors.append(sc_err)
 
         dispatch_cap, dc_err = validate_and_parse_float(
-            row.get("dispatch_capacity_daily") or row.get("dispatch_capacity"),
+            row.get("dispatch_capacity_daily") or row.get("dispatch_capacity") or row.get("daily_dispatch_capacity"),
             "dispatch_capacity_daily",
             row_num,
             allow_negative=False,
             default=None,
+            required=False,
         )
-        if dc_err and row.get("dispatch_capacity_daily") not in [None, ""]:
+        if dc_err:
             row_errors.append(dc_err)
 
         is_active = True
@@ -364,7 +489,7 @@ def validate_locations_dataset(
             valid_records.append({
                 "location_id": location_id,
                 "name": name,
-                "location_type": location_type,
+                "location_type": normalized_type,
                 "region": region,
                 "city": city,
                 "address": address,

@@ -65,7 +65,7 @@ const DATASETS: DatasetMeta[] = [
     id: 'locations',
     title: 'Network Locations',
     icon: MapPin,
-    requiredFields: ['location_id', 'name', 'location_type', 'region (opt)', 'address (opt)'],
+    requiredFields: ['location_id', 'name', 'location_type', 'region', 'city (opt)', 'address (opt)'],
     purpose: 'Classifies plant sources, regional distribution centers (RDC), and retail destination hubs.',
   },
   {
@@ -366,16 +366,23 @@ export const ImportCentrePage: React.FC = () => {
         <CardContent className="pt-6 space-y-6">
           {/* Required Fields Pill List */}
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
-            <span className="font-semibold text-slate-700 shrink-0">Required Columns:</span>
+            <span className="font-semibold text-slate-700 shrink-0">Required & Canonical Columns:</span>
             <div className="flex flex-wrap gap-1.5">
-              {activeDatasetMeta.requiredFields.map((col) => (
-                <code
-                  key={col}
-                  className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 font-mono text-[11px]"
-                >
-                  {col}
-                </code>
-              ))}
+              {activeDatasetMeta.requiredFields.map((col) => {
+                const isOpt = col.includes('(opt)');
+                return (
+                  <code
+                    key={col}
+                    className={`px-2 py-0.5 rounded font-mono text-[11px] ${
+                      isOpt
+                        ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold'
+                    }`}
+                  >
+                    {col}
+                  </code>
+                );
+              })}
             </div>
           </div>
 
@@ -559,6 +566,15 @@ export const ImportCentrePage: React.FC = () => {
               </div>
             </Card>
           </div>
+
+          {/* Missing Column Alert Banner */}
+          {selectedRunErrors.some((e) => e.error_code === 'MISSING_COLUMN') && (
+            <Alert variant="error" title="Missing Required Header Column">
+              The uploaded file header is missing one or more required columns. For {activeDatasetMeta.title}, required columns are:{' '}
+              <strong>{activeDatasetMeta.requiredFields.filter(f => !f.includes('(opt)')).join(', ')}</strong>.
+              Please verify your column headers or download the official template from the top-right buttons.
+            </Alert>
+          )}
 
           {/* Row-Level Errors Table */}
           {selectedRunErrors.length > 0 ? (

@@ -1,4 +1,8 @@
-location_id,name,location_type,region,address
-LOC-WH-MUM,Mumbai Central Mega Warehouse,central_warehouse,West,Plot 12 MIDC Industrial Area
-LOC-DC-PUN,Pune Regional Distribution Center,regional_dc,West,Wagholi Logistics Park
-LOC-HUB-BLR,Bengaluru South Forward Hub,distributor_hub,South,Electronic City Phase 2
+location_id,name,location_type,region,city,address,storage_capacity_units,dispatch_capacity_daily,is_active
+LOC-PLT-NAS,Nashik Manufacturing Plant,manufacturing_plant,West,Nashik,Ambad MIDC Industrial Area,50000,12000,True
+LOC-WH-MUM,Mumbai Central Warehouse,company_warehouse,West,Mumbai,Plot 12 MIDC Industrial Area,30000,8000,True
+LOC-RDC-PUN,Pune Regional Distribution Centre,regional_warehouse,West,Pune,Chakan MIDC Phase 2,18000,5000,True
+LOC-DC-PUN,Pune Distributor Godown,distributor_warehouse,West,Pune,Wagholi Logistics Park,6000,1800,True
+LOC-DC-KOL,Kolhapur Distributor Godown,distributor_warehouse,West,Kolhapur,Shiroli MIDC Industrial Area,4500,1200,True
+LOC-RET-NAS01,Nashik Retail Store 01,retail_destination,West,Nashik,College Road Retail Market,1200,250,True
+LOC-RET-PUN01,Pune Retail Store 01,retail_destination,West,Pune,FC Road Commercial Hub,1000,200,True

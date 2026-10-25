@@ -345,8 +345,12 @@ async def upload_dataset(
         db.add(db_err)
         db_errors.append(db_err)
 
-    db.commit()
-    db.refresh(import_run)
+    try:
+        db.commit()
+        db.refresh(import_run)
+    except Exception:
+        db.rollback()
+        raise
 
     return ImportRunSummaryResponse(
         run_id=import_run.run_id,

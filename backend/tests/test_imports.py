@@ -1,4 +1,5 @@
 import io
+import os
 from fastapi.testclient import TestClient
 import openpyxl
 
@@ -100,21 +101,207 @@ def test_products_duplicate_key_rejection(client: TestClient):
     assert data["errors"][0]["error_code"] == "DUPLICATE_KEY"
 
 
-def test_locations_import(client: TestClient):
-    """Test valid location ingestion and retrieval."""
+def test_valid_locations_csv_import_seven_sample_records(client: TestClient):
+    """Test uploading valid Locations CSV with all 7 sample locations."""
     csv_data = (
-        "location_id,name,location_type,region,address\n"
-        "WH-NORTH,North Central Warehouse,central_warehouse,North,Gurgaon\n"
-        "DIST-DELHI,Delhi Hub,distributor,North,Okhla\n"
+        "location_id,name,location_type,region,city,address,storage_capacity_units,dispatch_capacity_daily,is_active\n"
+        "LOC-PLT-NAS,Nashik Manufacturing Plant,manufacturing_plant,West,Nashik,Ambad MIDC Industrial Area,50000,12000,True\n"
+        "LOC-WH-MUM,Mumbai Central Warehouse,company_warehouse,West,Mumbai,Plot 12 MIDC Industrial Area,30000,8000,True\n"
+        "LOC-RDC-PUN,Pune Regional Distribution Centre,regional_warehouse,West,Pune,Chakan MIDC Phase 2,18000,5000,True\n"
+        "LOC-DC-PUN,Pune Distributor Godown,distributor_warehouse,West,Pune,Wagholi Logistics Park,6000,1800,True\n"
+        "LOC-DC-KOL,Kolhapur Distributor Godown,distributor_warehouse,West,Kolhapur,Shiroli MIDC Industrial Area,4500,1200,True\n"
+        "LOC-RET-NAS01,Nashik Retail Store 01,retail_destination,West,Nashik,College Road Retail Market,1200,250,True\n"
+        "LOC-RET-PUN01,Pune Retail Store 01,retail_destination,West,Pune,FC Road Commercial Hub,1000,200,True\n"
     )
     files = {"file": ("locations.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
     response = client.post("/api/imports/locations", files=files)
     assert response.status_code == 200
-    assert response.json()["valid_rows"] == 2
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["total_rows"] == 7
+    assert data["valid_rows"] == 7
+    assert data["rejected_rows"] == 0
+    assert len(data["errors"]) == 0
 
+    # Verify retrieval from /api/locations
     loc_resp = client.get("/api/locations")
     assert loc_resp.status_code == 200
-    assert len(loc_resp.json()) == 2
+    locs = loc_resp.json()
+    assert len(locs) >= 7
+    assert any(l["location_id"] == "LOC-PLT-NAS" and l["region"] == "West" for l in locs)
+
+    # Verify retrieval from /api/network/locations
+    net_resp = client.get("/api/network/locations")
+    assert net_resp.status_code == 200
+    net_locs = net_resp.json()
+    nas_plant = next((l for l in net_locs if l["location_id"] == "LOC-PLT-NAS"), None)
+    assert nas_plant is not None
+    assert nas_plant["region"] == "West"
+    assert nas_plant["storage_capacity_units"] == 50000.0
+
+
+def test_valid_locations_excel_import(client: TestClient):
+    """Test uploading valid Locations Excel (.xlsx) file with all 7 sample locations."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "locations"
+    ws.append(["location_id", "name", "location_type", "region", "city", "address", "storage_capacity_units", "dispatch_capacity_daily", "is_active"])
+    rows = [
+        ["LOC-PLT-NAS", "Nashik Manufacturing Plant", "plant", "West", "Nashik", "Ambad MIDC", 50000, 12000, True],
+        ["LOC-WH-MUM", "Mumbai Central Warehouse", "company_warehouse", "West", "Mumbai", "Plot 12 MIDC", 30000, 8000, True],
+        ["LOC-RDC-PUN", "Pune Regional Distribution Centre", "regional_warehouse", "West", "Pune", "Chakan MIDC", 18000, 5000, True],
+        ["LOC-DC-PUN", "Pune Distributor Godown", "distributor", "West", "Pune", "Wagholi Park", 6000, 1800, True],
+        ["LOC-DC-KOL", "Kolhapur Distributor Godown", "distributor", "West", "Kolhapur", "Shiroli MIDC", 4500, 1200, True],
+        ["LOC-RET-NAS01", "Nashik Retail Store 01", "retailer", "West", "Nashik", "College Road", 1200, 250, True],
+        ["LOC-RET-PUN01", "Pune Retail Store 01", "retailer", "West", "Pune", "FC Road", 1000, 200, True],
+    ]
+    for r in rows:
+        ws.append(r)
+    excel_stream = io.BytesIO()
+    wb.save(excel_stream)
+    excel_stream.seek(0)
+
+    files = {"file": ("locations.xlsx", excel_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    response = client.post("/api/imports/locations", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["total_rows"] == 7
+    assert data["valid_rows"] == 7
+    assert data["rejected_rows"] == 0
+
+
+def test_locations_missing_region_column_rejects_and_prevents_persistence(client: TestClient):
+    """Test that missing required 'region' column produces MISSING_COLUMN error and does not persist."""
+    csv_data = (
+        "location_id,name,location_type,city,state,storage_capacity_units,dispatch_capacity_daily,is_active\n"
+        "LOC-PLT-NAS-FAIL,Nashik Manufacturing Plant,plant,Nashik,Maharashtra,50000,12000,True\n"
+        "LOC-WH-MUM-FAIL,Mumbai Central Warehouse,company_warehouse,Mumbai,Maharashtra,30000,8000,True\n"
+        "LOC-RDC-PUN-FAIL,Pune Regional Distribution Centre,regional_warehouse,Pune,Maharashtra,18000,5000,True\n"
+        "LOC-DC-PUN-FAIL,Pune Distributor Godown,distributor,Pune,Maharashtra,6000,1800,True\n"
+        "LOC-DC-KOL-FAIL,Kolhapur Distributor Godown,distributor,Kolhapur,Maharashtra,4500,1200,True\n"
+        "LOC-RET-NAS01-FAIL,Nashik Retail Store 01,retailer,Nashik,Maharashtra,1200,250,True\n"
+        "LOC-RET-PUN01-FAIL,Pune Retail Store 01,retailer,Pune,Maharashtra,1000,200,True\n"
+    )
+    files = {"file": ("locations.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/locations", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "failed"
+    assert data["total_rows"] == 7
+    assert data["valid_rows"] == 0
+    assert data["rejected_rows"] == 7
+    assert len(data["errors"]) >= 1
+
+    region_err = next((e for e in data["errors"] if e["field_name"] == "region"), None)
+    assert region_err is not None
+    assert region_err["error_code"] == "MISSING_COLUMN"
+    assert "Missing required column 'region'" in region_err["error_reason"]
+    assert "Expected canonical headers" in region_err["error_reason"]
+
+    # Verify no records were persisted into /api/locations
+    loc_resp = client.get("/api/locations")
+    assert loc_resp.status_code == 200
+    loc_ids = [l["location_id"] for l in loc_resp.json()]
+    assert "LOC-PLT-NAS-FAIL" not in loc_ids
+    assert "LOC-WH-MUM-FAIL" not in loc_ids
+
+
+def test_locations_blank_region_row_quarantine(client: TestClient):
+    """Test that a blank region rejects only the affected row when column is present."""
+    csv_data = (
+        "location_id,name,location_type,region\n"
+        "LOC-QUAR-VALID,Valid Location,company_warehouse,West\n"
+        "LOC-QUAR-INVALID,Invalid Blank Region,distributor,\n"
+    )
+    files = {"file": ("locations_partial.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/locations", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["total_rows"] == 2
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 1
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["row_index"] == 3
+    assert data["errors"][0]["field_name"] == "region"
+    assert data["errors"][0]["error_code"] == "MISSING_FIELD"
+    assert "Location region is required." in data["errors"][0]["error_reason"]
+
+    # Verify only the valid row is persisted
+    loc_resp = client.get("/api/locations")
+    loc_ids = [l["location_id"] for l in loc_resp.json()]
+    assert "LOC-QUAR-VALID" in loc_ids
+    assert "LOC-QUAR-INVALID" not in loc_ids
+
+
+def test_locations_duplicate_id_and_invalid_type_validation(client: TestClient):
+    """Test rejection of duplicate location IDs and invalid location types."""
+    csv_data = (
+        "location_id,name,location_type,region\n"
+        "LOC-DUP-UNIQUE,First Copy,central_warehouse,North\n"
+        "LOC-DUP-UNIQUE,Second Copy,distributor,North\n"
+        "LOC-BAD-TYPE,Bad Type Facility,invalid_type_xyz,South\n"
+    )
+    files = {"file": ("locations_invalid.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/locations", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 2
+    error_codes = [e["error_code"] for e in data["errors"]]
+    assert "DUPLICATE_KEY" in error_codes
+    assert "INVALID_LOCATION_TYPE" in error_codes
+
+
+def test_downloaded_location_templates_round_trip(client: TestClient):
+    """Test that downloading the official location template and re-uploading succeeds cleanly."""
+    # 1. Download CSV template
+    csv_resp = client.get("/api/imports/templates/locations?format=csv")
+    assert csv_resp.status_code == 200
+    assert "region" in csv_resp.text
+
+    # Re-upload the downloaded CSV
+    files_csv = {"file": ("StockWise_template_locations.csv", io.BytesIO(csv_resp.text.encode("utf-8")), "text/csv")}
+    upload_csv_resp = client.post("/api/imports/locations", files=files_csv)
+    assert upload_csv_resp.status_code == 200
+    assert upload_csv_resp.json()["status"] == "completed"
+    assert upload_csv_resp.json()["valid_rows"] == 7
+    assert upload_csv_resp.json()["rejected_rows"] == 0
+
+    # 2. Download Excel template
+    xlsx_resp = client.get("/api/imports/templates/locations?format=xlsx")
+    assert xlsx_resp.status_code == 200
+
+    # Re-upload the downloaded Excel
+    files_xlsx = {"file": ("StockWise_template_locations.xlsx", io.BytesIO(xlsx_resp.content), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    upload_xlsx_resp = client.post("/api/imports/locations", files=files_xlsx)
+    assert upload_xlsx_resp.status_code == 200
+    assert upload_xlsx_resp.json()["status"] == "completed"
+    assert upload_xlsx_resp.json()["valid_rows"] == 7
+    assert upload_xlsx_resp.json()["rejected_rows"] == 0
+
+
+def test_test_data_location_files_import_successfully(client: TestClient):
+    """Test that backend/test_data/locations.csv and locations.xlsx import with 100% validity."""
+    backend_csv = os.path.join(os.path.dirname(__file__), "..", "test_data", "locations.csv")
+    with open(backend_csv, "rb") as f:
+        files = {"file": ("locations.csv", io.BytesIO(f.read()), "text/csv")}
+    res = client.post("/api/imports/locations", files=files)
+    assert res.status_code == 200
+    assert res.json()["status"] == "completed"
+    assert res.json()["valid_rows"] == 7
+    assert res.json()["rejected_rows"] == 0
+
+    backend_xlsx = os.path.join(os.path.dirname(__file__), "..", "test_data", "locations.xlsx")
+    with open(backend_xlsx, "rb") as f:
+        files = {"file": ("locations.xlsx", io.BytesIO(f.read()), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    res_x = client.post("/api/imports/locations", files=files)
+    assert res_x.status_code == 200
+    assert res_x.json()["status"] == "completed"
+    assert res_x.json()["valid_rows"] == 7
+    assert res_x.json()["rejected_rows"] == 0
 
 
 def test_inventory_foreign_key_validation(client: TestClient):
