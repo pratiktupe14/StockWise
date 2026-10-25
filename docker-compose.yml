@@ -1,22 +1,39 @@
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: stockwise_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: stockwise_user
-      POSTGRES_PASSWORD: stockwise_password
-      POSTGRES_DB: stockwise
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stockwise_user -d stockwise"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+version: '3.8'
 
-volumes:
-  pgdata:
-    driver: local
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockwise-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - stockwise-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: stockwise-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - stockwise-net
+
+networks:
+  stockwise-net:
+    driver: bridge

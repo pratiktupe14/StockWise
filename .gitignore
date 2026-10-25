@@ -44,6 +44,8 @@ yarn-error.log*
 *.sqlite3
 *.db
 pgdata/
+backups/
+backend/backups/
 
 # IDE & Editor
 .vscode/

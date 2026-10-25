@@ -1,0 +1,4 @@
+location_id,name,location_type,region,address
+LOC-WH-MUM,Mumbai Central Mega Warehouse,central_warehouse,West,Plot 12 MIDC Industrial Area
+LOC-DC-PUN,Pune Regional Distribution Center,regional_dc,West,Wagholi Logistics Park
+LOC-HUB-BLR,Bengaluru South Forward Hub,distributor_hub,South,Electronic City Phase 2

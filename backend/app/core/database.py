@@ -4,18 +4,52 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from app.core.config import settings
 
+from urllib.parse import quote_plus, unquote_plus
+
+
+def sanitize_db_url(url: str) -> str:
+    """
+    Safely handles and normalizes database connection URLs.
+    Handles URL-encoding of reserved characters in database passwords (e.g. '@', '#', '%')
+    so that SQLAlchemy engine initialization never fails on special characters.
+    """
+    if not url or not url.startswith("postgresql"):
+        return url
+    if "://" not in url:
+        return url
+    scheme, rest = url.split("://", 1)
+    if "@" not in rest or ":" not in rest:
+        return url
+    user_pass, host_part = rest.rsplit("@", 1)
+    if ":" not in user_pass:
+        return url
+    user, raw_pass = user_pass.split(":", 1)
+    cleaned_pass = quote_plus(unquote_plus(raw_pass))
+    return f"{scheme}://{user}:{cleaned_pass}@{host_part}"
+
+
+normalized_database_url = sanitize_db_url(settings.DATABASE_URL)
+
 # Engine configuration
 connect_args: Dict[str, Any] = {}
-if settings.DATABASE_URL.startswith("postgresql"):
+engine_kwargs: Dict[str, Any] = {"pool_pre_ping": True}
+
+if normalized_database_url.startswith("postgresql"):
     connect_args["connect_timeout"] = settings.DB_CONNECT_TIMEOUT_SECONDS
+    # Ensure SSL is enabled for cloud/remote PostgreSQL instances like Supabase
+    if "sslmode" not in normalized_database_url.lower() and "localhost" not in normalized_database_url and "127.0.0.1" not in normalized_database_url:
+        connect_args["sslmode"] = "require"
+    engine_kwargs["pool_size"] = 5
+    engine_kwargs["max_overflow"] = 10
+elif normalized_database_url.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
 
 engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
+    normalized_database_url,
     connect_args=connect_args,
+    **engine_kwargs,
 )
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -29,6 +63,16 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def init_db() -> None:
+    """
+    Creates database tables for local SQLite development.
+    For PostgreSQL / Supabase, schema is managed strictly via Alembic migrations.
+    """
+    if settings.DATABASE_URL.startswith("sqlite"):
+        import app.models.entities  # Ensure models are imported
+        Base.metadata.create_all(bind=engine)
 
 
 def check_database_connection() -> Dict[str, Any]:

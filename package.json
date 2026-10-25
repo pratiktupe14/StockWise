@@ -1,0 +1,12 @@
+{
+  "name": "stockwise-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StockWise FMCG Distribution Intelligence & Optimization",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint"
+  }
+}

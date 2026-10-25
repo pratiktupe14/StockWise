@@ -28,7 +28,21 @@ class Settings(BaseSettings):
     ]
 
     DATABASE_URL: str = "postgresql+psycopg2://stockwise_user:stockwise_password@localhost:5432/stockwise"
-    DB_CONNECT_TIMEOUT_SECONDS: int = 3
+    DB_CONNECT_TIMEOUT_SECONDS: int = 10
+
+    # Supabase & Auth Configuration
+    SUPABASE_URL: str = "https://irhunosgwyvgdhcnzbki.supabase.co"
+    SUPABASE_PUBLISHABLE_KEY: Union[str, None] = None
+    SUPABASE_JWT_SECRET: Union[str, None] = None
+    SUPABASE_JWT_ALGORITHM: str = "HS256"
+    SUPABASE_JWT_AUDIENCE: Union[str, None] = None
+    REQUIRE_AUTH: bool = False
+    ALLOW_DEMO_AUTH: bool = True
+
+    # Security & Logging
+    LOG_LEVEL: str = "INFO"
+    ENABLE_IDEMPOTENCY: bool = True
+    MAX_FILE_UPLOAD_SIZE_MB: int = 10
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
@@ -36,6 +50,12 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    def is_demo_allowed(self) -> bool:
+        return self.ALLOW_DEMO_AUTH and not self.is_production()
 
 
 settings = Settings()

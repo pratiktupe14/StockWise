@@ -42,3 +42,27 @@ def get_system_health() -> HealthResponse:
         api="online",
         database=database_health,
     )
+
+
+@router.get(
+    "/ready",
+    summary="Kubernetes & Container Readiness Probe",
+    description="Returns 200 OK only when the service and database pool are operational and ready for traffic.",
+)
+def get_readiness():
+    db_check = check_database_connection()
+    if not db_check["connected"]:
+        from fastapi import Response
+        return Response(
+            content='{"status": "not_ready", "error": "Database unavailable"}',
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            media_type="application/json",
+        )
+    return {
+        "status": "ready",
+        "service": settings.APP_NAME,
+        "database": "connected",
+        "dialect": db_check["dialect"],
+        "latency_ms": db_check["latency_ms"],
+        "version": settings.VERSION,
+    }

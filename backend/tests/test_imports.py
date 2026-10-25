@@ -1,0 +1,240 @@
+import io
+from fastapi.testclient import TestClient
+import openpyxl
+
+
+def test_download_csv_template(client: TestClient):
+    """Test downloading CSV templates for all dataset types."""
+    for dt in ["products", "locations", "inventory", "sales", "routes"]:
+        response = client.get(f"/api/imports/templates/{dt}?format=csv")
+        assert response.status_code == 200
+        assert "text/csv" in response.headers["content-type"]
+        assert len(response.text) > 0
+
+
+def test_download_excel_template(client: TestClient):
+    """Test downloading Excel templates."""
+    response = client.get("/api/imports/templates/products?format=xlsx")
+    assert response.status_code == 200
+    assert "spreadsheetml" in response.headers["content-type"]
+    assert len(response.content) > 0
+
+
+def test_valid_products_csv_import(client: TestClient):
+    """Test uploading a valid products CSV file."""
+    csv_data = (
+        "sku_id,name,category,unit,case_pack,shelf_life_days\n"
+        "SKU-001,Detergent Powder,Fabric Care,cases,12,730\n"
+        "SKU-002,Bathing Soap,Personal Care,cases,24,365\n"
+    )
+    files = {"file": ("products.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/products", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["total_rows"] == 2
+    assert data["valid_rows"] == 2
+    assert data["rejected_rows"] == 0
+    assert len(data["errors"]) == 0
+
+    # Verify persistence in /api/products
+    prod_resp = client.get("/api/products")
+    assert prod_resp.status_code == 200
+    products = prod_resp.json()
+    assert len(products) == 2
+    assert products[0]["sku_id"] == "SKU-001"
+
+
+def test_valid_products_excel_import(client: TestClient):
+    """Test uploading a valid products Excel file (.xlsx)."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["sku_id", "name", "category", "unit", "case_pack", "shelf_life_days"])
+    ws.append(["SKU-EXCEL-1", "Excel Product 1", "Groceries", "cases", 10, 180])
+    excel_stream = io.BytesIO()
+    wb.save(excel_stream)
+    excel_stream.seek(0)
+
+    files = {"file": ("products.xlsx", excel_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    response = client.post("/api/imports/products", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 0
+
+
+def test_products_missing_required_fields(client: TestClient):
+    """Test rejection when required fields are missing."""
+    csv_data = (
+        "sku_id,name,category,unit,case_pack\n"
+        ",Detergent Without SKU,Fabric Care,cases,12\n"
+        "SKU-VALID,Named Product,Fabric Care,cases,12\n"
+    )
+    files = {"file": ("products_missing.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/products", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 1
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["error_code"] == "MISSING_FIELD"
+    assert data["errors"][0]["field_name"] == "sku_id"
+
+
+def test_products_duplicate_key_rejection(client: TestClient):
+    """Test rejection of duplicate keys within the uploaded file."""
+    csv_data = (
+        "sku_id,name,category,unit,case_pack\n"
+        "SKU-DUP,Product A,Fabric Care,cases,12\n"
+        "SKU-DUP,Product B,Fabric Care,cases,12\n"
+    )
+    files = {"file": ("products_dup.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/products", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 1
+    assert data["errors"][0]["error_code"] == "DUPLICATE_KEY"
+
+
+def test_locations_import(client: TestClient):
+    """Test valid location ingestion and retrieval."""
+    csv_data = (
+        "location_id,name,location_type,region,address\n"
+        "WH-NORTH,North Central Warehouse,central_warehouse,North,Gurgaon\n"
+        "DIST-DELHI,Delhi Hub,distributor,North,Okhla\n"
+    )
+    files = {"file": ("locations.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/locations", files=files)
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 2
+
+    loc_resp = client.get("/api/locations")
+    assert loc_resp.status_code == 200
+    assert len(loc_resp.json()) == 2
+
+
+def test_inventory_foreign_key_validation(client: TestClient):
+    """Test that inventory referencing non-existent SKU or location is rejected."""
+    # Seed 1 valid location only
+    loc_csv = "location_id,name,location_type,region\nWH-REAL,Real Warehouse,central_warehouse,North\n"
+    client.post("/api/imports/locations", files={"file": ("loc.csv", io.BytesIO(loc_csv.encode("utf-8")), "text/csv")})
+
+    # Upload inventory with unknown SKU and unknown location
+    inv_csv = (
+        "snapshot_id,sku_id,location_id,on_hand,reserved,blocked,as_of_date\n"
+        "SNAP-1,SKU-GHOST,WH-REAL,100,10,0,2026-10-24\n"
+        "SNAP-1,SKU-GHOST,LOC-GHOST,100,10,0,2026-10-24\n"
+    )
+    files = {"file": ("inv.csv", io.BytesIO(inv_csv.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/inventory", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "failed"
+    assert data["valid_rows"] == 0
+    assert data["rejected_rows"] == 2
+    error_codes = [e["error_code"] for e in data["errors"]]
+    assert "UNKNOWN_SKU" in error_codes
+
+
+def test_inventory_dispatchable_calculation(client: TestClient):
+    """Test dispatchable stock calculation: max(0, on_hand - reserved - blocked)."""
+    # Seed product and location
+    prod_csv = "sku_id,name,unit,case_pack\nSKU-ITEM1,Item One,cases,1\n"
+    loc_csv = "location_id,name,location_type,region\nLOC-WH1,Warehouse One,central_warehouse,West\n"
+    client.post("/api/imports/products", files={"file": ("p.csv", io.BytesIO(prod_csv.encode("utf-8")), "text/csv")})
+    client.post("/api/imports/locations", files={"file": ("l.csv", io.BytesIO(loc_csv.encode("utf-8")), "text/csv")})
+
+    # Upload inventory: on_hand=100, reserved=25, blocked=15 -> dispatchable should be 60
+    inv_csv = (
+        "snapshot_id,sku_id,location_id,on_hand,reserved,blocked,as_of_date\n"
+        "SNAP-TEST,SKU-ITEM1,LOC-WH1,100,25,15,2026-10-24\n"
+    )
+    files = {"file": ("inv.csv", io.BytesIO(inv_csv.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/inventory", files=files)
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 1
+
+    # Check /api/inventory
+    inv_get = client.get("/api/inventory")
+    assert inv_get.status_code == 200
+    items = inv_get.json()
+    assert len(items) == 1
+    assert items[0]["on_hand"] == 100.0
+    assert items[0]["reserved"] == 25.0
+    assert items[0]["blocked"] == 15.0
+    assert items[0]["dispatchable_stock"] == 60.0
+
+
+def test_inventory_negative_quantity_rejection(client: TestClient):
+    """Test that negative on_hand or reserved quantities are rejected."""
+    prod_csv = "sku_id,name,unit,case_pack\nSKU-P1,P1,cases,1\n"
+    loc_csv = "location_id,name,location_type,region\nLOC-L1,L1,central_warehouse,West\n"
+    client.post("/api/imports/products", files={"file": ("p.csv", io.BytesIO(prod_csv.encode("utf-8")), "text/csv")})
+    client.post("/api/imports/locations", files={"file": ("l.csv", io.BytesIO(loc_csv.encode("utf-8")), "text/csv")})
+
+    inv_csv = (
+        "snapshot_id,sku_id,location_id,on_hand,reserved,blocked,as_of_date\n"
+        "SNAP-TEST,SKU-P1,LOC-L1,-50,0,0,2026-10-24\n"
+    )
+    files = {"file": ("inv_neg.csv", io.BytesIO(inv_csv.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/inventory", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["rejected_rows"] == 1
+    assert data["errors"][0]["error_code"] == "NEGATIVE_QUANTITY"
+
+
+def test_routes_self_referencing_and_values(client: TestClient):
+    """Test self-referencing route rejection and negative lead times."""
+    loc_csv = "location_id,name,location_type,region\nLOC-A,Node A,regional_dc,North\nLOC-B,Node B,distributor,North\n"
+    client.post("/api/imports/locations", files={"file": ("l.csv", io.BytesIO(loc_csv.encode("utf-8")), "text/csv")})
+
+    # Route with from_id == to_id and route with negative lead time
+    routes_csv = (
+        "from_location_id,to_location_id,lead_time_days,cost_rate\n"
+        "LOC-A,LOC-A,2.0,50.0\n"
+        "LOC-A,LOC-B,-1.0,40.0\n"
+        "LOC-B,LOC-A,1.5,35.0\n"
+    )
+    files = {"file": ("routes.csv", io.BytesIO(routes_csv.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/routes", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid_rows"] == 1  # only row 3 is valid
+    assert data["rejected_rows"] == 2
+    error_codes = [e["error_code"] for e in data["errors"]]
+    assert "SELF_REFERENCING_ROUTE" in error_codes
+    assert "NEGATIVE_QUANTITY" in error_codes or "INVALID_LEAD_TIME" in error_codes
+
+
+def test_unsupported_file_extension(client: TestClient):
+    """Test rejection of unsupported file types."""
+    files = {"file": ("data.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")}
+    response = client.post("/api/imports/products", files=files)
+    assert response.status_code == 400
+    assert "Unsupported file format" in response.json()["detail"]
+
+
+def test_import_history_and_errors_api(client: TestClient):
+    """Test /api/imports and /api/imports/{run_id}/errors endpoints."""
+    csv_data = "sku_id,name\nSKU-TEST,Test Name\n,Missing Name\n"
+    files = {"file": ("test.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    upload_res = client.post("/api/imports/products", files=files)
+    run_id = upload_res.json()["run_id"]
+
+    # Check history
+    history_res = client.get("/api/imports")
+    assert history_res.status_code == 200
+    runs = history_res.json()["runs"]
+    assert any(r["run_id"] == run_id for r in runs)
+
+    # Check errors endpoint
+    err_res = client.get(f"/api/imports/{run_id}/errors")
+    assert err_res.status_code == 200
+    errs = err_res.json()
+    assert len(errs) >= 1
+    assert errs[0]["error_code"] == "MISSING_FIELD"
