@@ -61,6 +61,15 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     roles: ['admin'],
   },
   {
+    id: 'warehouses',
+    label: 'Warehouses',
+    path: '/warehouses',
+    iconName: 'Warehouse',
+    description: 'Company warehouse capacities, dispatchable stock, and facility utilization',
+    portals: ['company_admin', 'warehouse_logistics'],
+    roles: ['admin', 'planner', 'logistics', 'viewer'],
+  },
+  {
     id: 'inventory',
     label: 'Inventory Balances',
     path: '/inventory',

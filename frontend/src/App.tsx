@@ -37,6 +37,9 @@ const UtsavSensePage = React.lazy(() =>
 const ApprovalExportPage = React.lazy(() =>
   import('./pages/ApprovalExportPage').then((m) => ({ default: m.ApprovalExportPage }))
 );
+const WarehousesPage = React.lazy(() =>
+  import('./pages/WarehousesPage').then((m) => ({ default: m.WarehousesPage }))
+);
 
 export const App: React.FC = () => {
   return (
@@ -51,6 +54,14 @@ export const App: React.FC = () => {
                 element={
                   <RoleGuard allowedRoles={['admin', 'planner']} portalTitle="Network & Routes">
                     <NetworkManagementPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="warehouses"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner', 'logistics', 'viewer']} portalTitle="Warehouses">
+                    <WarehousesPage />
                   </RoleGuard>
                 }
               />

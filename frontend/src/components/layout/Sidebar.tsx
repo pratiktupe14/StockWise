@@ -15,6 +15,7 @@ import {
   Flame,
   Store,
   ShoppingBag,
+  Warehouse,
 } from 'lucide-react';
 import { NAVIGATION_ITEMS } from '../../types/navigation';
 import { usePortal } from '../../context/PortalContext';
@@ -22,6 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const iconMap: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="w-4 h-4 shrink-0" />,
+  Warehouse: <Warehouse className="w-4 h-4 shrink-0 text-blue-600" />,
   Network: <Network className="w-4 h-4 shrink-0" />,
   UploadCloud: <UploadCloud className="w-4 h-4 shrink-0" />,
   Boxes: <Boxes className="w-4 h-4 shrink-0" />,
