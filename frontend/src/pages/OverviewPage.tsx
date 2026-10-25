@@ -13,6 +13,7 @@ import {
   Activity,
   Clock,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
@@ -318,6 +319,36 @@ export const OverviewPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Algorithm Validation Engine Row */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-[#E5E7EB] bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-emerald-600">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-[#172033]">Algorithm Validation (16 Modules)</div>
+                  <div className="text-[11px] text-[#667085]">
+                    {health.data?.validation_summary ? (
+                      <span>
+                        Coverage: {health.data.validation_summary.overall_feature_coverage_percent.toFixed(0)}% • {health.data.validation_summary.total_passed} checks verified
+                      </span>
+                    ) : (
+                      'Automated regression engine'
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                {health.data?.validation_summary?.overall_test_pass_rate_percent != null ? (
+                  <Badge variant="success" dot size="sm">
+                    {health.data.validation_summary.overall_test_pass_rate_percent.toFixed(1)}% Pass Rate
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" size="sm">Active</Badge>
+                )}
+              </div>
+            </div>
+
             {/* Message detail */}
             <div className="p-3 rounded-lg bg-white border border-[#E5E7EB] text-xs text-slate-600">
               <div className="font-medium text-[#172033] mb-1">Database Health Check Log:</div>
@@ -330,7 +361,14 @@ export const OverviewPage: React.FC = () => {
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
               <span>Last checked: {health.lastChecked ? health.lastChecked.toLocaleTimeString() : 'Never'}</span>
-              <span>Polling interval: 30s</span>
+              <button
+                type="button"
+                onClick={() => navigate('/system-health')}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1"
+              >
+                <span>View Full Validation Report</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </CardContent>
         </Card>

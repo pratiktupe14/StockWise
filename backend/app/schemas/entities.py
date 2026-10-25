@@ -108,6 +108,8 @@ class RouteResponse(BaseModel):
     cost_rate: float
     capacity_units: Optional[float] = None
     sku_eligibility: Optional[str] = "all"
+    carrier_agency_id: Optional[str] = None
+    pricing_basis: Optional[str] = "per_unit"
     created_at: datetime
 
 

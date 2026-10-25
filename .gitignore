@@ -58,3 +58,10 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Large Datasets & Raw Downloads
+data/raw/
+data/downloads/
+*.parquet
+*.zip
+*.tar.gz

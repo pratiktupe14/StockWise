@@ -1,0 +1,12 @@
+org_id,name,org_type,is_active
+BENCHMARK-COMPANY,StockWise FMCG India Enterprise (Benchmark),fmcg_company,True
+BENCHMARK-LOGISTICS,All-India Logistics Fleet Network,logistics_provider,True
+ORG-RET-MUMBAI,Mumbai Metro Retailers Consortium,retailer,True
+ORG-RET-PUNE,Pune Distribution Network,retailer,True
+ORG-RET-DELHI,Delhi NCR Grocers Association,retailer,True
+ORG-RET-GURUGRAM,Gurugram Modern Trade Retail,retailer,True
+ORG-RET-BENGALURU,Bengaluru Retailers Cooperative,retailer,True
+ORG-RET-CHENNAI,Chennai Distribution Federation,retailer,True
+ORG-RET-KOLKATA,Kolkata Traders Syndicate,retailer,True
+ORG-RET-HYDERABAD,Hyderabad Merchant Guild,retailer,True
+ORG-RET-AHMEDABAD,Gujarat Retail Traders Council,retailer,True

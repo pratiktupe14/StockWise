@@ -425,3 +425,280 @@ def test_import_history_and_errors_api(client: TestClient):
     errs = err_res.json()
     assert len(errs) >= 1
     assert errs[0]["error_code"] == "MISSING_FIELD"
+
+
+def _seed_sales_master_data(client: TestClient):
+    """Seeds prerequisite product and location master records for sales testing."""
+    prod_csv = (
+        "sku_id,name,category,unit,case_pack,shelf_life_days\n"
+        "SKU-DET-001,Sparkle Detergent Powder 1kg,Home Care,piece,12,730\n"
+        "SKU-TEA-003,Assam Gold Tea 500g,Beverages,piece,24,540\n"
+        "SKU-BIS-002,Golden Crunch Biscuits 200g,Packaged Food,piece,48,270\n"
+    )
+    client.post("/api/imports/products", files={"file": ("p.csv", io.BytesIO(prod_csv.encode("utf-8")), "text/csv")})
+
+    loc_csv = (
+        "location_id,name,location_type,region,city\n"
+        "LOC-DC-PUN,Pune Distributor Godown,distributor_warehouse,West,Pune\n"
+        "LOC-RET-NAS01,Nashik Retail Store 01,retail_destination,West,Nashik\n"
+    )
+    client.post("/api/imports/locations", files={"file": ("l.csv", io.BytesIO(loc_csv.encode("utf-8")), "text/csv")})
+
+
+def test_valid_sales_csv_import_fifteen_sample_records(client: TestClient):
+    """Test 1: Valid Sales History CSV import with 15 sample records."""
+    _seed_sales_master_data(client)
+
+    sales_csv_path = os.path.join(os.path.dirname(__file__), "..", "test_data", "sales.csv")
+    with open(sales_csv_path, "rb") as f:
+        content = f.read()
+
+    files = {"file": ("sales.csv", io.BytesIO(content), "text/csv")}
+    response = client.post("/api/imports/sales", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["total_rows"] == 15
+    assert data["valid_rows"] == 15
+    assert data["rejected_rows"] == 0
+    assert len(data["errors"]) == 0
+
+    # Verify records persisted in /api/sales
+    sales_res = client.get("/api/sales")
+    assert sales_res.status_code == 200
+    sales_list = sales_res.json()
+    assert len(sales_list) == 15
+
+
+def test_valid_sales_excel_import(client: TestClient):
+    """Test 2: Valid Sales History Excel import (.xlsx) with 15 records."""
+    _seed_sales_master_data(client)
+
+    sales_xlsx_path = os.path.join(os.path.dirname(__file__), "..", "test_data", "sales.xlsx")
+    with open(sales_xlsx_path, "rb") as f:
+        content = f.read()
+
+    files = {"file": ("sales.xlsx", io.BytesIO(content), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    response = client.post("/api/imports/sales", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["total_rows"] == 15
+    assert data["valid_rows"] == 15
+    assert data["rejected_rows"] == 0
+
+
+def test_sales_supported_quantity_aliases(client: TestClient):
+    """Test 3: Supported quantity-column aliases (units_sold, quantity_sold, sales_quantity)."""
+    _seed_sales_master_data(client)
+
+    # 1. quantity_sold alias
+    csv_1 = (
+        "sku_id,location_id,sales_date,quantity_sold\n"
+        "SKU-DET-001,LOC-DC-PUN,2026-10-18,22\n"
+    )
+    res_1 = client.post("/api/imports/sales", files={"file": ("s1.csv", io.BytesIO(csv_1.encode("utf-8")), "text/csv")})
+    assert res_1.status_code == 200
+    assert res_1.json()["valid_rows"] == 1
+    assert res_1.json()["rejected_rows"] == 0
+
+    # 2. units_sold alias
+    csv_2 = (
+        "sku_id,location_id,sales_date,units_sold\n"
+        "SKU-TEA-003,LOC-DC-PUN,2026-10-18,34\n"
+    )
+    res_2 = client.post("/api/imports/sales", files={"file": ("s2.csv", io.BytesIO(csv_2.encode("utf-8")), "text/csv")})
+    assert res_2.status_code == 200
+    assert res_2.json()["valid_rows"] == 1
+    assert res_2.json()["rejected_rows"] == 0
+
+    # 3. sales_quantity alias with destination_id
+    csv_3 = (
+        "sku_id,destination_id,sales_date,sales_quantity\n"
+        "SKU-BIS-002,LOC-RET-NAS01,2026-10-18,48\n"
+    )
+    res_3 = client.post("/api/imports/sales", files={"file": ("s3.csv", io.BytesIO(csv_3.encode("utf-8")), "text/csv")})
+    assert res_3.status_code == 200
+    assert res_3.json()["valid_rows"] == 1
+    assert res_3.json()["rejected_rows"] == 0
+
+
+def test_sales_missing_quantity_column_rejects(client: TestClient):
+    """Test 4: Missing quantity column triggers file-level MISSING_COLUMN error and prevents persistence."""
+    _seed_sales_master_data(client)
+
+    # CSV without quantity or any alias
+    csv_missing_col = (
+        "sku_id,location_id,sales_date\n"
+        "SKU-DET-001,LOC-DC-PUN,2026-10-18\n"
+        "SKU-DET-001,LOC-DC-PUN,2026-10-19\n"
+    )
+    files = {"file": ("missing_qty.csv", io.BytesIO(csv_missing_col.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/sales", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "failed"
+    assert data["valid_rows"] == 0
+    assert data["rejected_rows"] == 2
+    assert len(data["errors"]) >= 1
+    err = data["errors"][0]
+    assert err["error_code"] == "MISSING_COLUMN"
+    assert err["field_name"] == "quantity"
+    assert "Expected canonical headers" in err["error_reason"]
+
+    # Verify zero sales records persisted
+    sales_res = client.get("/api/sales")
+    assert sales_res.status_code == 200
+    assert len(sales_res.json()) == 0
+
+
+def test_sales_blank_negative_and_nonnumeric_quantities(client: TestClient):
+    """Test 5: Blank, negative, and non-numeric quantities are quarantined; zero quantity is allowed."""
+    _seed_sales_master_data(client)
+
+    csv_data = (
+        "sku_id,location_id,sales_date,quantity\n"
+        "SKU-DET-001,LOC-DC-PUN,2026-10-18,\n"       # Blank quantity -> MISSING_FIELD
+        "SKU-DET-001,LOC-DC-PUN,2026-10-19,-15\n"    # Negative quantity -> NEGATIVE_QUANTITY
+        "SKU-DET-001,LOC-DC-PUN,2026-10-20,invalid\n"# Non-numeric quantity -> INVALID_NUMERIC
+        "SKU-DET-001,LOC-DC-PUN,2026-10-21,0\n"      # Zero quantity -> Valid 0.0
+        "SKU-DET-001,LOC-DC-PUN,2026-10-22,35\n"     # Positive quantity -> Valid 35.0
+    )
+    files = {"file": ("quantities.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/sales", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["total_rows"] == 5
+    assert data["valid_rows"] == 2
+    assert data["rejected_rows"] == 3
+
+    errors_by_code = {e["error_code"]: e for e in data["errors"]}
+    assert "MISSING_FIELD" in errors_by_code
+    assert errors_by_code["MISSING_FIELD"]["row_index"] == 2
+    assert "NEGATIVE_QUANTITY" in errors_by_code
+    assert errors_by_code["NEGATIVE_QUANTITY"]["row_index"] == 3
+    assert "INVALID_NUMERIC" in errors_by_code
+    assert errors_by_code["INVALID_NUMERIC"]["row_index"] == 4
+
+
+def test_sales_invalid_sku_location_date_and_duplicates(client: TestClient):
+    """Test 6: Invalid SKU, location, date, and duplicate compound key validations."""
+    _seed_sales_master_data(client)
+
+    csv_data = (
+        "sku_id,location_id,sales_date,quantity\n"
+        "SKU-NONEXISTENT,LOC-DC-PUN,2026-10-18,10\n"  # UNKNOWN_SKU
+        "SKU-DET-001,LOC-NONEXISTENT,2026-10-18,10\n"  # UNKNOWN_LOCATION
+        ",LOC-DC-PUN,2026-10-18,10\n"                 # Missing SKU -> MISSING_FIELD
+        "SKU-DET-001,,2026-10-18,10\n"                 # Missing Location -> MISSING_FIELD
+        "SKU-DET-001,LOC-DC-PUN,not-a-date,10\n"       # Invalid date -> INVALID_DATE_FORMAT
+        "SKU-DET-001,LOC-DC-PUN,,10\n"                 # Missing date -> MISSING_FIELD
+        "SKU-DET-001,LOC-DC-PUN,2026-10-22,10\n"       # Valid row
+        "SKU-DET-001,LOC-DC-PUN,2026-10-22,15\n"       # Duplicate compound key -> DUPLICATE_KEY
+    )
+    files = {"file": ("invalids.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    response = client.post("/api/imports/sales", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["valid_rows"] == 1
+    assert data["rejected_rows"] == 7
+
+    error_codes = [e["error_code"] for e in data["errors"]]
+    assert "UNKNOWN_SKU" in error_codes
+    assert "UNKNOWN_LOCATION" in error_codes
+    assert "MISSING_FIELD" in error_codes
+    assert "INVALID_DATE_FORMAT" in error_codes
+    assert "DUPLICATE_KEY" in error_codes
+
+
+def test_sales_import_history_and_error_report(client: TestClient):
+    """Test 7: Correct import-history and error-report generation."""
+    _seed_sales_master_data(client)
+
+    csv_data = (
+        "sku_id,location_id,sales_date,quantity\n"
+        "SKU-DET-001,LOC-DC-PUN,2026-10-18,-50\n"
+    )
+    files = {"file": ("error_run.csv", io.BytesIO(csv_data.encode("utf-8")), "text/csv")}
+    res = client.post("/api/imports/sales", files=files)
+    assert res.status_code == 200
+    run_id = res.json()["run_id"]
+
+    # Check history contains run
+    history_res = client.get("/api/imports")
+    assert history_res.status_code == 200
+    runs = history_res.json()["runs"]
+    matched_run = next((r for r in runs if r["run_id"] == run_id), None)
+    assert matched_run is not None
+    assert matched_run["dataset_type"] == "sales"
+    assert matched_run["rejected_rows"] == 1
+
+    # Check specific errors report
+    err_res = client.get(f"/api/imports/{run_id}/errors")
+    assert err_res.status_code == 200
+    errs = err_res.json()
+    assert len(errs) == 1
+    assert errs[0]["error_code"] == "NEGATIVE_QUANTITY"
+    assert errs[0]["field_name"] == "quantity"
+
+
+def test_sales_import_followed_by_forecasting_retrieval(client: TestClient):
+    """Test 8: Successful import followed by correct demand-forecasting data retrieval."""
+    _seed_sales_master_data(client)
+
+    sales_csv_path = os.path.join(os.path.dirname(__file__), "..", "test_data", "sales.csv")
+    with open(sales_csv_path, "rb") as f:
+        files = {"file": ("sales.csv", io.BytesIO(f.read()), "text/csv")}
+    upload_res = client.post("/api/imports/sales", files=files)
+    assert upload_res.status_code == 200
+    assert upload_res.json()["valid_rows"] == 15
+
+    # Demand forecasting retrieval
+    planner_headers = {"Authorization": "Bearer demo-planner-token"}
+    forecast_res = client.get(
+        "/api/forecast?sku_id=SKU-DET-001&destination_id=LOC-DC-PUN&horizon_days=7",
+        headers=planner_headers,
+    )
+    assert forecast_res.status_code == 200
+    fdata = forecast_res.json()
+    assert "forecasts" in fdata
+    assert len(fdata["forecasts"]) >= 1
+    item = next((i for i in fdata["forecasts"] if i["sku_id"] == "SKU-DET-001" and i["destination_id"] == "LOC-DC-PUN"), None)
+    assert item is not None
+    assert item["daily_forecast_rate"] == 25.6
+    assert item["total_forecast_demand"] > 0
+    assert len(item["forecast_method"]) > 0
+
+
+def test_downloaded_sales_templates_round_trip(client: TestClient):
+    """Test 9: Official downloadable sales CSV and Excel templates round-trip with 15 valid records."""
+    _seed_sales_master_data(client)
+
+    # 1. Download CSV template
+    csv_resp = client.get("/api/imports/templates/sales?format=csv")
+    assert csv_resp.status_code == 200
+    assert "quantity" in csv_resp.text
+    assert "LOC-DC-PUN" in csv_resp.text
+
+    # Re-upload CSV template
+    files_csv = {"file": ("sales_template.csv", io.BytesIO(csv_resp.text.encode("utf-8")), "text/csv")}
+    upload_csv = client.post("/api/imports/sales", files=files_csv)
+    assert upload_csv.status_code == 200
+    assert upload_csv.json()["status"] == "completed"
+    assert upload_csv.json()["valid_rows"] == 15
+    assert upload_csv.json()["rejected_rows"] == 0
+
+    # 2. Download Excel template
+    xlsx_resp = client.get("/api/imports/templates/sales?format=xlsx")
+    assert xlsx_resp.status_code == 200
+
+    # Re-upload Excel template
+    files_xlsx = {"file": ("sales_template.xlsx", io.BytesIO(xlsx_resp.content), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    upload_xlsx = client.post("/api/imports/sales", files=files_xlsx)
+    assert upload_xlsx.status_code == 200
+    assert upload_xlsx.json()["status"] == "completed"
+    assert upload_xlsx.json()["valid_rows"] == 15
+    assert upload_xlsx.json()["rejected_rows"] == 0
+

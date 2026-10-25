@@ -29,6 +29,7 @@ import {
 } from '../components/ui/Table';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getNetworkLocations, getInventory, getShipments } from '../services/api';
+import { useDatasetSync } from '../services/dataSync';
 import type { LocationItem, InventoryItem, ShipmentItem } from '../types/api';
 
 // Utility helper to format location types cleanly
@@ -111,6 +112,8 @@ export const WarehousesPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const syncInfo = useDatasetSync(['locations', 'inventory'], fetchData);
 
   useEffect(() => {
     fetchData();
@@ -281,6 +284,11 @@ export const WarehousesPage: React.FC = () => {
               Warehouse Management
             </h1>
             <Badge variant="primary" size="sm">Company Network</Badge>
+            {syncInfo.formattedSyncTime && (
+              <Badge variant="neutral" size="sm">
+                Synced {syncInfo.formattedSyncTime} ({syncInfo.dataset})
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-[#667085] mt-1">
             Authorized company warehouses, storage capacities, real-time stock balances, and facility utilization.

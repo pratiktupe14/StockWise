@@ -1,0 +1,17 @@
+location_id,name,location_type,region,city,address,storage_capacity_units,dispatch_capacity_daily,latitude,longitude,is_active,owner_org_id,operator_org_id
+WH-BHIWANDI,Bhiwandi Central Logistics Park,central_warehouse,West,Bhiwandi,"Bhiwandi Logistics Zone, Thane, Maharashtra 421302",100000.0,8000.0,19.2969,73.0631,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-SONIPAT,Sonipat Central Distribution Center,central_warehouse,North,Sonipat,"Kundli Industrial Area, Sonipat, Haryana 131028",120000.0,10000.0,28.9931,77.0151,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-CHAKAN,Chakan Regional Distribution Hub,regional_warehouse,West,Pune,"MIDC Phase 2, Chakan, Pune, Maharashtra 410501",60000.0,5000.0,18.7606,73.8636,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-SRICITY,Sri City FMCG Manufacturing Plant,manufacturing_plant,South,Sri City,"Industrial Zone, Sri City, Tirupati, Andhra Pradesh 517646",150000.0,12000.0,13.5283,80.0244,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-WHITEFIELD,Whitefield Regional Warehouse,regional_warehouse,South,Bengaluru,"EPIP Zone, Whitefield, Bengaluru, Karnataka 560066",75000.0,6000.0,12.9698,77.7499,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-DANKUNI,Dankuni Regional Supply Hub,regional_warehouse,East,Kolkata,"NH-19 Logistics Corridor, Dankuni, Hooghly, West Bengal 712311",80000.0,6000.0,22.6842,88.2917,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+WH-NAGPUR,Nagpur Multi-Modal Logistics Center,central_warehouse,Central,Nagpur,"MIHAN Industrial SEZ, Nagpur, Maharashtra 441108",90000.0,7000.0,21.1458,79.0882,True,BENCHMARK-COMPANY,BENCHMARK-COMPANY
+RET-MUMBAI-SOUTH,Mumbai South Modern Trade Cluster,retail_destination,West,Mumbai,"Crawford Market & Fort Area, Mumbai, Maharashtra 400001",20000.0,2000.0,18.9388,72.8354,True,ORG-RET-MUMBAI,ORG-RET-MUMBAI
+RET-PUNE-METRO,Pune Metro FMCG Distribution,retail_destination,West,Pune,"Gultekdi Market Yard, Pune, Maharashtra 411037",25000.0,2500.0,18.5204,73.8567,True,ORG-RET-PUNE,ORG-RET-PUNE
+RET-DELHI-CENTRAL,Delhi Central FMCG Mart,retail_destination,North,Delhi,"Chandni Chowk Commercial District, New Delhi 110006",30000.0,3000.0,28.6506,77.2303,True,ORG-RET-DELHI,ORG-RET-DELHI
+RET-GURUGRAM,Gurugram Retail Supercentre,retail_destination,North,Gurugram,"DLF Cyber City Retail Corridor, Gurugram, Haryana 122002",22000.0,2200.0,28.4595,77.0266,True,ORG-RET-GURUGRAM,ORG-RET-GURUGRAM
+RET-BENGALURU-URBAN,Bengaluru Urban Consumer Mart,retail_destination,South,Bengaluru,"Koramangala Commercial Hub, Bengaluru, Karnataka 560034",28000.0,2800.0,12.9716,77.5946,True,ORG-RET-BENGALURU,ORG-RET-BENGALURU
+RET-CHENNAI-NORTH,Chennai Metro Trade Hub,retail_destination,South,Chennai,"George Town Wholesale Market, Chennai, Tamil Nadu 600001",24000.0,2400.0,13.0827,80.2707,True,ORG-RET-CHENNAI,ORG-RET-CHENNAI
+RET-KOLKATA-EAST,Kolkata East Consumer Mart,retail_destination,East,Kolkata,"Salt Lake Sector V Consumer Hub, Kolkata, West Bengal 700091",26000.0,2500.0,22.5726,88.3639,True,ORG-RET-KOLKATA,ORG-RET-KOLKATA
+RET-HYDERABAD-SEC,Hyderabad & Secunderabad Marts,retail_destination,South,Hyderabad,"Begum Bazar FMCG Market, Hyderabad, Telangana 500012",25000.0,2500.0,17.385,78.4867,True,ORG-RET-HYDERABAD,ORG-RET-HYDERABAD
+RET-AHMEDABAD-W,Ahmedabad West Trade Cluster,retail_destination,West,Ahmedabad,"Kalupur Wholesale Market, Ahmedabad, Gujarat 380001",22000.0,2000.0,23.0225,72.5714,True,ORG-RET-AHMEDABAD,ORG-RET-AHMEDABAD

@@ -2,5 +2,6 @@ sku_id,name,category,unit,case_pack,shelf_life_days
 SKU-DET-001,Sparkle Detergent Powder 1kg,Fabric Care,cases,12,730
 SKU-SOAP-002,PureCare Bathing Soap 125g,Personal Care,cases,24,1095
 SKU-TEA-003,Assam Gold Tea 500g,Beverages,cases,20,365
+SKU-BIS-002,Golden Crunch Biscuits 200g,Packaged Food,cases,48,270
 SKU-BISC-004,Crisp Crunch Wheat Biscuits 200g,Snacks,cases,30,180
 SKU-SHAM-005,SilkGlow Shampoo 340ml,Hair Care,cases,16,730

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.core.database import get_db
 from app.models.entities import (
     Product,
@@ -35,7 +35,7 @@ router = APIRouter(tags=["Operational Entities"])
 @router.get("/products", response_model=List[ProductResponse], summary="List validated products")
 def list_products(
     category: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = RequireAuthenticated,
 ):
@@ -176,7 +176,7 @@ def list_categories(
 def list_locations(
     location_type: Optional[str] = None,
     region: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = RequireAuthenticated,
 ):
@@ -195,7 +195,8 @@ def list_inventory(
     location_id: Optional[str] = None,
     sku_id: Optional[str] = None,
     owner_org_id: Optional[str] = None,
-    limit: int = Query(200, ge=1, le=1000),
+    include_benchmark: bool = Query(False, description="Include benchmark public inventory records"),
+    limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = RequireAuthenticated,
 ):
@@ -203,6 +204,7 @@ def list_inventory(
     Returns inventory snapshots with mathematically computed dispatchable stock.
     Current dispatchable stock = max(0, on_hand - reserved - blocked).
     Strict tenant isolation: Non-admins can only query inventory owned by their trusted organization.
+    Separates public benchmark data from real operational company data.
     """
     query = (
         db.query(InventorySnapshot, Product, Location, Organization)
@@ -220,6 +222,18 @@ def list_inventory(
             return []
     elif owner_org_id:
         query = query.filter(InventorySnapshot.owner_org_id == owner_org_id.strip())
+    elif not include_benchmark and (not snapshot_id or snapshot_id != "SNAP-BENCHMARK-PUBLIC"):
+        # Keep public benchmark data separate from real operational company records by default
+        query = query.filter(
+            or_(
+                InventorySnapshot.owner_org_id != "BENCHMARK-COMPANY",
+                InventorySnapshot.owner_org_id.is_(None),
+            ),
+            or_(
+                InventorySnapshot.snapshot_id != "SNAP-BENCHMARK-PUBLIC",
+                InventorySnapshot.snapshot_id.is_(None),
+            ),
+        )
 
     if snapshot_id:
         query = query.filter(InventorySnapshot.snapshot_id == snapshot_id)
@@ -424,6 +438,8 @@ def list_routes(
                 cost_rate=r.cost_rate,
                 capacity_units=r.capacity_units,
                 sku_eligibility=r.sku_eligibility,
+                carrier_agency_id=r.carrier_agency_id,
+                pricing_basis=r.pricing_basis,
                 created_at=r.created_at,
             )
         )

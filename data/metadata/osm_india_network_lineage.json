@@ -1,0 +1,17 @@
+{
+  "dataset_name": "OpenStreetMap India Logistics Network & OSRM Routes",
+  "canonical_source_url": "https://www.openstreetmap.org/",
+  "routing_engine_url": "http://router.project-osrm.org/",
+  "retrieval_timestamp": "2026-10-25T04:53:37.644620+00:00",
+  "license": "ODbL 1.0 (Open Data Commons Open Database License) / BSD 2-Clause",
+  "license_url": "https://opendatacommons.org/licenses/odbl/",
+  "attribution": "\u00a9 OpenStreetMap contributors, OSRM Project Routing Engine",
+  "facilities_count": 16,
+  "organizations_count": 11,
+  "routes_count": 63,
+  "osrm_verified_count": 63,
+  "average_route_distance_km": 1102.4,
+  "min_distance_km": 19.11,
+  "max_distance_km": 2166.02,
+  "cost_model": "Calibrated Indian FMCG freight: Base \u20b935 + \u20b90.18/case-km based on real OSRM driving distance"
+}

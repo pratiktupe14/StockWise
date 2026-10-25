@@ -7,6 +7,7 @@ import type {
   ProductItem,
   LocationItem,
   RouteItem,
+  SalesHistoryItem,
   DatasetType,
   OrganizationItem,
   NetworkEligibilityResponse,
@@ -45,6 +46,17 @@ import type {
   AdminUserItem,
   RequestCancelPayload,
   ReceiptConfirmPayload,
+  DatasetReadinessResponse,
+  DatasetSourceItem,
+  BenchmarkIngestResponse,
+  ExpiryRiskSummaryResponse,
+  FEFOAllocationRequest,
+  FEFOAllocationResponse,
+  RedistributionSummaryResponse,
+  CreateRedistributionProposalRequest,
+  ForecastEvaluationResponse,
+  DistributionPerformanceResponse,
+  SystemValidationReport,
 } from '../types/api';
 import { getAuthHeaders } from './auth';
 
@@ -112,8 +124,12 @@ export async function uploadDataset(
   const formData = new FormData();
   formData.append('file', file);
 
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/imports/${datasetType}`, {
     method: 'POST',
+    headers: {
+      ...authHeaders,
+    },
     body: formData,
   });
 
@@ -135,9 +151,14 @@ export async function getImportRuns(datasetType?: string): Promise<ImportRunList
     ? `${API_BASE_URL}/imports?dataset_type=${encodeURIComponent(datasetType)}`
     : `${API_BASE_URL}/imports`;
 
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -151,9 +172,14 @@ export async function getImportRuns(datasetType?: string): Promise<ImportRunList
  * Retrieves row-level errors for a specific import run.
  */
 export async function getImportRunErrors(runId: string): Promise<ImportRowError[]> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/imports/${runId}/errors`, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -177,16 +203,25 @@ export async function getInventory(params?: {
   snapshotId?: string;
   locationId?: string;
   skuId?: string;
+  ownerOrgId?: string;
+  includeBenchmark?: boolean;
 }): Promise<InventoryItem[]> {
   const query = new URLSearchParams();
   if (params?.snapshotId) query.append('snapshot_id', params.snapshotId);
   if (params?.locationId) query.append('location_id', params.locationId);
   if (params?.skuId) query.append('sku_id', params.skuId);
+  if (params?.ownerOrgId) query.append('owner_org_id', params.ownerOrgId);
+  if (params?.includeBenchmark) query.append('include_benchmark', 'true');
 
   const url = `${API_BASE_URL}/inventory${query.toString() ? `?${query.toString()}` : ''}`;
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -202,7 +237,7 @@ export async function getInventory(params?: {
 export async function getInventoryExpiryRisk(params?: {
   skuId?: string;
   locationId?: string;
-}): Promise<any> {
+}): Promise<ExpiryRiskSummaryResponse> {
   const query = new URLSearchParams();
   if (params?.skuId) query.append('sku_id', params.skuId);
   if (params?.locationId) query.append('location_id', params.locationId);
@@ -227,13 +262,7 @@ export async function getInventoryExpiryRisk(params?: {
 /**
  * Executes deterministic FEFO batch allocation for requested demand.
  */
-export async function allocateInventoryFefo(payload: {
-  sku_id: string;
-  demand_quantity: number;
-  source_location_id?: string;
-  destination_location_id?: string;
-  min_remaining_shelf_life_days?: number;
-}): Promise<any> {
+export async function allocateInventoryFefo(payload: FEFOAllocationRequest): Promise<FEFOAllocationResponse> {
   const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/inventory/fefo-allocate`, {
     method: 'POST',
@@ -252,6 +281,8 @@ export async function allocateInventoryFefo(payload: {
   return response.json();
 }
 
+export const allocateInventoryFEFO = allocateInventoryFefo;
+
 /**
  * Retrieves authorized redistribution recommendations for near-expiry and surplus stock.
  */
@@ -259,7 +290,7 @@ export async function getRedistributionRecommendations(params?: {
   skuId?: string;
   sourceLocationId?: string;
   maxExpiryDays?: number;
-}): Promise<any> {
+}): Promise<RedistributionSummaryResponse> {
   const query = new URLSearchParams();
   if (params?.skuId) query.append('sku_id', params.skuId);
   if (params?.sourceLocationId) query.append('source_location_id', params.sourceLocationId);
@@ -285,14 +316,7 @@ export async function getRedistributionRecommendations(params?: {
 /**
  * Submits an authorized redistribution recommendation as a formal shipment proposal.
  */
-export async function submitRedistributionProposal(payload: {
-  sku_id: string;
-  source_location_id: string;
-  destination_location_id: string;
-  quantity: number;
-  batch_number?: string;
-  notes?: string;
-}): Promise<any> {
+export async function submitRedistributionProposal(payload: CreateRedistributionProposalRequest): Promise<ShipmentItem> {
   const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/redistribution/propose`, {
     method: 'POST',
@@ -310,6 +334,7 @@ export async function submitRedistributionProposal(payload: {
     throw new ApiError(msg, response.status, body);
   }
 
+
   return response.json();
 }
 
@@ -319,9 +344,14 @@ export async function submitRedistributionProposal(payload: {
  * Retrieves list of master products.
  */
 export async function getProducts(): Promise<ProductItem[]> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/products`, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -335,9 +365,14 @@ export async function getProducts(): Promise<ProductItem[]> {
  * Retrieves list of master locations.
  */
 export async function getLocations(): Promise<LocationItem[]> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/locations`, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -351,15 +386,50 @@ export async function getLocations(): Promise<LocationItem[]> {
  * Retrieves permitted routes.
  */
 export async function getRoutes(): Promise<RouteItem[]> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/routes`, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
     throw new ApiError(`Failed to fetch routes (HTTP ${response.status})`, response.status);
   }
 
+  return response.json();
+}
+
+/**
+ * Retrieves historical sales / consumption records.
+ */
+export async function getSalesHistory(params?: {
+  skuId?: string;
+  destinationId?: string;
+  limit?: number;
+}): Promise<SalesHistoryItem[]> {
+  const query = new URLSearchParams();
+  if (params?.skuId) query.append('sku_id', params.skuId);
+  if (params?.destinationId) query.append('destination_id', params.destinationId);
+  if (params?.limit) query.append('limit', String(params.limit));
+
+  const url = `${API_BASE_URL}/sales${query.toString() ? `?${query.toString()}` : ''}`;
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch sales history (HTTP ${response.status})`, response.status);
+  }
   return response.json();
 }
 
@@ -372,9 +442,14 @@ export async function getOrganizations(params?: { orgType?: string; isActive?: b
   if (params?.isActive !== undefined) query.append('is_active', String(params.isActive));
 
   const url = `${API_BASE_URL}/organizations${query.toString() ? `?${query.toString()}` : ''}`;
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -387,9 +462,14 @@ export async function getOrganizations(params?: { orgType?: string; isActive?: b
  * Registers an organization.
  */
 export async function createOrganization(payload: Partial<OrganizationItem>): Promise<OrganizationItem> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/organizations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -410,9 +490,14 @@ export async function getNetworkLocations(params?: { locationType?: string; regi
   if (params?.region) query.append('region', params.region);
 
   const url = `${API_BASE_URL}/network/locations${query.toString() ? `?${query.toString()}` : ''}`;
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -425,9 +510,14 @@ export async function getNetworkLocations(params?: { locationType?: string; regi
  * Creates a network location/facility.
  */
 export async function createNetworkLocation(payload: Partial<LocationItem>): Promise<LocationItem> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/network/locations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -447,9 +537,14 @@ export async function getNetworkRoutes(isActive?: boolean): Promise<RouteItem[]>
   if (isActive !== undefined) query.append('is_active', String(isActive));
 
   const url = `${API_BASE_URL}/network/routes${query.toString() ? `?${query.toString()}` : ''}`;
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -462,9 +557,14 @@ export async function getNetworkRoutes(isActive?: boolean): Promise<RouteItem[]>
  * Creates or configures a permitted distribution route.
  */
 export async function createNetworkRoute(payload: Partial<RouteItem>): Promise<RouteItem> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/network/routes`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -480,9 +580,14 @@ export async function createNetworkRoute(payload: Partial<RouteItem>): Promise<R
  * Analyzes network eligibility, evaluating corridors and unserviceable destinations.
  */
 export async function getNetworkEligibility(): Promise<NetworkEligibilityResponse> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/network/eligibility`, {
     method: 'GET',
-    headers: { 'Accept': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...authHeaders,
+    },
   });
 
   if (!response.ok) {
@@ -500,6 +605,7 @@ export async function getShipments(params?: {
   skuId?: string;
   sourceLocationId?: string;
   destinationLocationId?: string;
+  limit?: number;
 }): Promise<ShipmentItem[]> {
   const query = new URLSearchParams();
   if (params?.status) query.append('status', params.status);
@@ -507,6 +613,7 @@ export async function getShipments(params?: {
   if (params?.skuId) query.append('sku_id', params.skuId);
   if (params?.sourceLocationId) query.append('source_location_id', params.sourceLocationId);
   if (params?.destinationLocationId) query.append('destination_location_id', params.destinationLocationId);
+  if (params?.limit) query.append('limit', params.limit.toString());
 
   const url = `${API_BASE_URL}/shipments${query.toString() ? `?${query.toString()}` : ''}`;
   const response = await fetch(url, {
@@ -796,6 +903,35 @@ export async function getDemandForecast(
 }
 
 /**
+ * P1 & P2: Evaluates ML forecast model against historical holdout data.
+ * Computes MAE, WAPE, and Forecast Accuracy without data leakage.
+ * Returns aligned historical and future demand time-series without fabricated actuals.
+ */
+export async function getForecastEvaluation(
+  horizonDays: number = 7,
+  skuId?: string,
+  destinationId?: string
+): Promise<ForecastEvaluationResponse> {
+  const query = new URLSearchParams();
+  query.append('horizon_days', horizonDays.toString());
+  if (skuId) query.append('sku_id', skuId);
+  if (destinationId) query.append('destination_id', destinationId);
+
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/forecast/evaluation?${query.toString()}`, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json', ...authHeaders },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.detail || `Failed to fetch forecast evaluation (HTTP ${response.status})`, response.status);
+  }
+  return response.json();
+}
+
+
+/**
  * Evaluates destination stock positions, days of cover, demand gaps, and stockout risks.
  */
 export async function getInventoryRisks(
@@ -976,14 +1112,47 @@ export async function getOperationalPerformanceMetrics(): Promise<OperationalPer
 }
 
 /**
+ * P3: Computes four core distribution performance KPIs:
+ * 1. Demand fulfilment rate (%)
+ * 2. Transportation cost (₹)
+ * 3. Stockout rate (%)
+ * 4. Cost reduction (%)
+ * Differentiates verified operational execution records from estimated optimization plans.
+ */
+export async function getDistributionPerformance(
+  runId?: string
+): Promise<DistributionPerformanceResponse> {
+  const query = new URLSearchParams();
+  if (runId) query.append('run_id', runId);
+
+  const authHeaders = await getAuthHeaders();
+  const url = `${API_BASE_URL}/optimization/distribution-performance${query.toString() ? `?${query.toString()}` : ''}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json', ...authHeaders },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.detail || `Failed to fetch distribution performance KPIs (HTTP ${response.status})`, response.status);
+  }
+  return response.json();
+}
+
+
+/**
  * Previews and validates dataset file before committing.
  */
 export async function previewDataset(datasetType: DatasetType, file: File): Promise<ImportRunSummary> {
   const formData = new FormData();
   formData.append('file', file);
 
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/imports/${encodeURIComponent(datasetType)}/preview`, {
     method: 'POST',
+    headers: {
+      ...authHeaders,
+    },
     body: formData,
   });
 
@@ -1488,5 +1657,117 @@ export async function cancelRetailerRequest(shipmentId: string, payload?: Reques
   return body as ShipmentItem;
 }
 
+/**
+ * Phase 5: Dataset Sources & Data Readiness Service Methods
+ */
+export async function getDatasetReadiness(): Promise<DatasetReadinessResponse> {
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/imports/readiness`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(body?.detail || `Failed to fetch dataset readiness (HTTP ${response.status})`, response.status, body);
+  }
+  return body as DatasetReadinessResponse;
+}
 
+export async function ingestBenchmarkDataset(datasetId: string = 'all', forceReload: boolean = false): Promise<BenchmarkIngestResponse> {
+  const authHeaders = await getAuthHeaders();
+  const query = new URLSearchParams({
+    dataset_id: datasetId,
+    force_reload: forceReload ? 'true' : 'false',
+  });
+  const response = await fetch(`${API_BASE_URL}/imports/benchmarks/ingest?${query.toString()}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(body?.detail || `Failed to ingest benchmark dataset (HTTP ${response.status})`, response.status, body);
+  }
+  return body as BenchmarkIngestResponse;
+}
 
+export async function getBenchmarkSourceDetail(sourceId: string): Promise<DatasetSourceItem> {
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/imports/benchmarks/sources/${encodeURIComponent(sourceId)}`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(body?.detail || `Failed to fetch dataset source detail (HTTP ${response.status})`, response.status, body);
+  }
+  return body as DatasetSourceItem;
+}
+
+// --- System Health & Algorithm Validation Endpoints ---
+export async function getSystemValidation(): Promise<SystemValidationReport> {
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/system-validation`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(body?.detail || `Failed to fetch system validation report (HTTP ${response.status})`, response.status, body);
+  }
+  return body as SystemValidationReport;
+}
+
+export async function runSystemValidation(): Promise<SystemValidationReport> {
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/system-validation/run`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(body?.detail || `Failed to execute system validation (HTTP ${response.status})`, response.status, body);
+  }
+  return body as SystemValidationReport;
+}
+
+export function getSystemValidationExportUrl(): string {
+  return `${API_BASE_URL}/system-validation/export`;
+}
+
+export async function exportSystemValidationReport(): Promise<void> {
+  const authHeaders = await getAuthHeaders();
+  const response = await fetch(getSystemValidationExportUrl(), {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...authHeaders,
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError(`Failed to export validation report (HTTP ${response.status})`, response.status);
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stockwise_validation_report_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}

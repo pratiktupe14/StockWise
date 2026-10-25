@@ -40,6 +40,16 @@ const ApprovalExportPage = React.lazy(() =>
 const WarehousesPage = React.lazy(() =>
   import('./pages/WarehousesPage').then((m) => ({ default: m.WarehousesPage }))
 );
+const PlanningResultsPage = React.lazy(() =>
+  import('./pages/PlanningResultsPage').then((m) => ({ default: m.PlanningResultsPage }))
+);
+const DistributionIntelligencePage = React.lazy(() =>
+  import('./pages/DistributionIntelligencePage').then((m) => ({ default: m.DistributionIntelligencePage }))
+);
+const SystemHealthPage = React.lazy(() =>
+  import('./pages/SystemHealthPage').then((m) => ({ default: m.SystemHealthPage }))
+);
+
 
 export const App: React.FC = () => {
   return (
@@ -130,6 +140,39 @@ export const App: React.FC = () => {
                 }
               />
               <Route
+                path="planning-results"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner', 'logistics', 'viewer']} portalTitle="End-to-End Planning Results">
+                    <PlanningResultsPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="company/planning-results"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner', 'logistics', 'viewer']} portalTitle="End-to-End Planning Results">
+                    <PlanningResultsPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="company/distribution-intelligence"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner']} portalTitle="Distribution Intelligence">
+                    <DistributionIntelligencePage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="distribution-intelligence"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner']} portalTitle="Distribution Intelligence">
+                    <DistributionIntelligencePage />
+                  </RoleGuard>
+                }
+              />
+
+              <Route
                 path="utsav-sense"
                 element={
                   <RoleGuard allowedRoles={['admin', 'planner']} portalTitle="UtsavSense Planning">
@@ -142,6 +185,22 @@ export const App: React.FC = () => {
                 element={
                   <RoleGuard allowedRoles={['admin', 'planner', 'logistics']} portalTitle="Approval & Export">
                     <ApprovalExportPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="system-health"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner', 'logistics', 'viewer']} portalTitle="System Health & Validation">
+                    <SystemHealthPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="health"
+                element={
+                  <RoleGuard allowedRoles={['admin', 'planner', 'logistics', 'viewer']} portalTitle="System Health & Validation">
+                    <SystemHealthPage />
                   </RoleGuard>
                 }
               />

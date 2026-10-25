@@ -23,6 +23,7 @@ import {
 } from '../components/ui/Table';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getInventory, getRedistributionRecommendations, submitRedistributionProposal } from '../services/api';
+import { useDatasetSync } from '../services/dataSync';
 import type { InventoryItem } from '../types/api';
 
 export const InventoryPage: React.FC = () => {
@@ -90,6 +91,11 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
+  const syncInfo = useDatasetSync(['inventory', 'products', 'locations'], () => {
+    fetchRecords();
+    fetchRedist();
+  });
+
   useEffect(() => {
     fetchRecords();
     fetchRedist();
@@ -142,6 +148,11 @@ export const InventoryPage: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold text-[#172033] tracking-tight">Inventory Visibility</h1>
             <Badge variant="success" size="sm">Live Persisted State</Badge>
+            {syncInfo.formattedSyncTime && (
+              <Badge variant="neutral" size="sm">
+                Synced {syncInfo.formattedSyncTime} ({syncInfo.dataset})
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-[#667085]">
             Multi-location warehouse balances with mathematically isolated dispatchable quantities.

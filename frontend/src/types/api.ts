@@ -15,6 +15,7 @@ export interface HealthResponse {
   timestamp: string;
   api: string;
   database: DatabaseHealth;
+  validation_summary?: SystemValidationReport | null;
 }
 
 export interface ApiState<T> {
@@ -45,6 +46,9 @@ export interface ImportRunSummary {
   total_rows: number;
   valid_rows: number;
   rejected_rows: number;
+  inserted_rows?: number;
+  updated_rows?: number;
+  skipped_rows?: number;
   snapshot_id?: string | null;
   created_at: string;
   errors: ImportRowError[];
@@ -62,6 +66,7 @@ export interface ProductItem {
   category?: string | null;
   unit: string;
   case_pack: number;
+  case_pack_quantity?: number;
   shelf_life_days?: number | null;
   created_at: string;
 }
@@ -133,6 +138,7 @@ export interface SalesHistoryItem {
   sales_date: string;
   location_id?: string;
   destination_id?: string;
+  destination_name?: string | null;
   sku_id: string;
   product_name?: string | null;
   units_sold?: number;
@@ -386,6 +392,7 @@ export interface ForecastResponse {
   total_skus: number;
   total_destinations: number;
   forecasts: ForecastItem[];
+  forecast_count?: number;
   holdout_evaluation_summary?: string | null;
 }
 
@@ -416,10 +423,12 @@ export interface RiskAnalysisItem {
 export interface RiskAnalysisResponse {
   horizon_days: number;
   critical_count: number;
+  critical_risk_count?: number;
   high_count: number;
   medium_count: number;
   low_count: number;
   items: RiskAnalysisItem[];
+  records?: RiskAnalysisItem[];
 }
 
 export interface OptimizationRequest {
@@ -455,6 +464,7 @@ export interface DecisionReceipt {
     allocated_quantity: number;
     expiry_date?: string | null;
     days_remaining?: number | null;
+    shelf_life_remaining_days?: number | null;
   }>;
   constraints_evaluated?: string[];
   stockout_prevented_units?: number;
@@ -632,6 +642,8 @@ export interface CorridorAlternativeItem {
   destination_location_name: string;
   route_id: number;
   distance_km?: number | null;
+  distance_source?: 'osrm_open_street_map' | 'haversine_road_adjusted' | 'transit_time_estimate' | 'not_available' | string;
+  is_verified_road_route?: boolean;
   lead_time_days: number;
   cost_rate_per_unit: number;
   handling_cost_per_unit: number;
@@ -771,8 +783,307 @@ export interface ReceiptConfirmPayload {
   notes?: string;
 }
 
+// --- Phase 5: Dataset Sources & Data Readiness Types ---
+export interface DatasetSourceItem {
+  id: string;
+  name: string;
+  source_url: string;
+  license: string;
+  license_url?: string;
+  attribution: string;
+  geography: string;
+  data_category: string;
+  is_downloaded: boolean;
+  is_ingested: boolean;
+  raw_total_records: number;
+  accepted_records: number;
+  rejected_cancellations: number;
+  checksum_sha256: string;
+  last_ingested_at?: string | null;
+  features_powered: string[];
+  missing_operational_fields: string[];
+  warnings: string[];
+  remediation_action: string;
+}
+
+export interface DatasetReadinessResponse {
+  status: string;
+  database_counts: {
+    organizations: number;
+    products: number;
+    locations: number;
+    inventory_snapshots: number;
+    sales_history_points: number;
+    routes: number;
+  };
+  benchmark_counts: {
+    benchmark_products: number;
+    benchmark_sales_points: number;
+    benchmark_routes: number;
+  };
+  sources: DatasetSourceItem[];
+  operational_readiness: {
+    forecasting_engine: string;
+    routing_engine: string;
+    distribution_optimizer: string;
+    fefo_expiry_protection: string;
+    logistics_execution: string;
+  };
+  fields_requiring_authorized_company_data: Array<{
+    entity: string;
+    field: string;
+    reason: string;
+  }>;
+}
+
+export interface BenchmarkIngestResponse {
+  status: string;
+  authorized_user: string;
+  message?: string;
+  records_ingested?: number;
+  results: Record<string, any>;
+}
+
 export interface RequestCancelPayload {
   reason?: string;
 }
 
+// --- Phase 6: Expiry Risk & FEFO Intelligence Types ---
+export interface BatchExpiryRiskItem {
+  id?: number | null;
+  snapshot_id: string;
+  sku_id: string;
+  product_name?: string | null;
+  location_id: string;
+  location_name?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  days_remaining?: number | null;
+  risk_category: 'expired' | 'critical' | 'warning' | 'high_risk' | 'medium_risk' | 'upcoming' | 'healthy' | 'unknown' | string;
+  on_hand: number;
+  reserved: number;
+  blocked: number;
+  dispatchable_quantity: number;
+  is_dispatchable: boolean;
+  owner_org_id?: string | null;
+}
 
+export interface ExpiryRiskSummaryResponse {
+  total_batches: number;
+  expired_batches: number;
+  expired_units: number;
+  critical_batches: number;
+  critical_units: number;
+  high_risk_batches: number;
+  high_risk_units: number;
+  medium_risk_batches: number;
+  medium_risk_units: number;
+  healthy_batches: number;
+  healthy_units: number;
+  unknown_expiry_batches: number;
+  unknown_expiry_units: number;
+  total_dispatchable_units: number;
+  items: BatchExpiryRiskItem[];
+}
+
+export interface FEFOAllocationRequest {
+  sku_id: string;
+  demand_quantity: number;
+  source_location_id?: string | null;
+  destination_location_id?: string | null;
+  min_remaining_shelf_life_days?: number;
+}
+
+export interface BatchAllocationItem {
+  snapshot_id: string;
+  batch_number?: string | null;
+  location_id: string;
+  expiry_date?: string | null;
+  days_remaining?: number | null;
+  allocated_quantity: number;
+  available_before_allocation: number;
+  remaining_after_allocation: number;
+}
+
+export interface FEFOAllocationResponse {
+  sku_id: string;
+  demand_quantity: number;
+  total_allocated: number;
+  unmet_demand: number;
+  is_fully_allocated: boolean;
+  min_remaining_shelf_life_days: number;
+  allocations: BatchAllocationItem[];
+}
+
+export interface RedistributionRecommendation {
+  recommendation_id: string;
+  sku_id: string;
+  product_name?: string | null;
+  source_location_id: string;
+  source_location_name?: string | null;
+  destination_location_id: string;
+  destination_location_name?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  days_remaining?: number | null;
+  risk_category: string;
+  source_available_units: number;
+  destination_unmet_demand: number;
+  recommended_quantity: number;
+  lead_time_days: number;
+  expected_delivery_date: string;
+  shelf_life_days_at_arrival: number;
+  estimated_transport_cost: number;
+  priority_score: number;
+  rationale: string;
+  owner_org_id: string;
+}
+
+export interface RedistributionRejectedCandidate {
+  sku_id: string;
+  source_location_id: string;
+  destination_location_id: string;
+  batch_number?: string | null;
+  rejection_reason: string;
+}
+
+export interface RedistributionSummaryResponse {
+  generated_at: string;
+  total_candidates_analyzed: number;
+  recommendations_count: number;
+  potential_units_saved: number;
+  total_estimated_transport_cost: number;
+  recommendations: RedistributionRecommendation[];
+  rejected_candidates: RedistributionRejectedCandidate[];
+}
+
+export interface CreateRedistributionProposalRequest {
+  sku_id: string;
+  source_location_id: string;
+  destination_location_id: string;
+  quantity: number;
+  batch_number?: string | null;
+  notes?: string | null;
+}
+
+// --- P1 & P2: ML Model Evaluation & Demand Series ---
+export interface ForecastEvaluationPoint {
+  date: string;
+  sku_id: string;
+  destination_id: string;
+  actual_demand?: number | null;
+  predicted_demand: number;
+  error?: number | null;
+  is_holdout: boolean;
+  is_future: boolean;
+}
+
+export interface ForecastEvaluationSeries {
+  sku_id: string;
+  product_name: string;
+  destination_id: string;
+  destination_name: string;
+  forecast_method: string;
+  data_sufficiency: 'sufficient' | 'insufficient_history' | 'zero_demand' | string;
+  sample_count: number;
+  total_actual_demand?: number | null;
+  total_predicted_demand?: number | null;
+  mae?: number | null;
+  wape?: number | null;
+  accuracy_percent?: number | null;
+  evaluation_period?: string | null;
+  evaluated_at: string;
+  points: ForecastEvaluationPoint[];
+}
+
+export interface ForecastEvaluationResponse {
+  evaluated_at: string;
+  horizon_days: number;
+  sample_count: number;
+  total_actual_demand?: number | null;
+  total_predicted_demand?: number | null;
+  mae?: number | null;
+  wape?: number | null;
+  accuracy_percent?: number | null;
+  evaluation_period?: string | null;
+  data_sufficiency: 'sufficient' | 'insufficient_history' | 'zero_demand' | string;
+  model_name?: string;
+  accuracy_formula_note?: string;
+  series: ForecastEvaluationSeries[];
+  aligned_timeseries: ForecastEvaluationPoint[];
+}
+
+// --- P3: Distribution Performance KPIs ---
+export interface DistributionPerformanceResponse {
+  as_of: string;
+  run_id?: string | null;
+  period_label: string;
+  data_source_mode: 'verified_operational' | 'estimated_plan' | 'simulated' | string;
+  demand_fulfilment_rate_percent: number;
+  fulfilled_demand_units: number;
+  eligible_demand_units: number;
+  demand_fulfilment_label: string;
+  transportation_cost: number;
+  transportation_cost_label: string;
+  has_recorded_shipments: boolean;
+  stockout_rate_percent: number;
+  unmet_demand_units: number;
+  stockout_rate_label: string;
+  cost_reduction_percent: number;
+  baseline_cost: number;
+  optimized_cost: number;
+  cost_savings: number;
+  cost_reduction_label: string;
+}
+
+// --- System Health & Algorithm Validation Engine ---
+export interface SystemValidationCheck {
+  check_id: string;
+  title: string;
+  module_id: string;
+  module_name: string;
+  category: string;
+  check_type: 'positive' | 'negative' | 'boundary' | 'failure_case';
+  status: 'passed' | 'failed' | 'warning' | 'blocked' | 'untested';
+  execution_time_ms: number;
+  message: string;
+  evidence: Record<string, any>;
+  error_detail?: string | null;
+  tested_at?: string | null;
+}
+
+export interface ModuleValidationSummary {
+  module_id: string;
+  name: string;
+  category: string;
+  description: string;
+  checks: SystemValidationCheck[];
+  passed_checks: number;
+  executed_checks: number;
+  total_in_scope_checks: number;
+  failed_checks: number;
+  warning_checks: number;
+  blocked_checks: number;
+  untested_checks: number;
+  test_pass_rate_percent: number | null; // null if unexecuted ("Not Tested")
+  feature_coverage_percent: number;
+  verified_coverage_percent: number;
+  status: 'passing' | 'degraded' | 'failing' | 'not_tested';
+}
+
+export interface SystemValidationReport {
+  report_id: string;
+  evaluated_at: string;
+  overall_test_pass_rate_percent: number | null;
+  overall_feature_coverage_percent: number;
+  overall_verified_coverage_percent: number;
+  total_passed: number;
+  total_failed: number;
+  total_warning: number;
+  total_blocked: number;
+  total_untested: number;
+  total_executed: number;
+  total_in_scope: number;
+  modules: ModuleValidationSummary[];
+  last_validation_timestamp: string;
+}

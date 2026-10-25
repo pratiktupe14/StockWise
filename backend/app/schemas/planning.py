@@ -242,6 +242,8 @@ class CorridorAlternativeItem(BaseModel):
     destination_location_name: str
     route_id: int
     distance_km: Optional[float] = None
+    distance_source: str = "haversine_road_adjusted"  # osrm_open_street_map | haversine_road_adjusted | transit_time_estimate | not_available
+    is_verified_road_route: bool = False
     lead_time_days: float
     cost_rate_per_unit: float
     handling_cost_per_unit: float = 0.0
@@ -329,3 +331,90 @@ class OperationalPerformanceResponse(BaseModel):
     average_cost_per_case: float
     lifecycle_breakdown: List[PerformanceLifecycleSummary]
     recent_plan_compliance: List[Dict[str, Any]]
+
+
+# --- ML Model Evaluation & Time-Series Schemas ---
+class ForecastEvaluationPoint(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: str
+    sku_id: str
+    destination_id: str
+    actual_demand: Optional[float] = None
+    predicted_demand: float
+    error: Optional[float] = None
+    is_holdout: bool = True
+    is_future: bool = False
+
+
+class ForecastEvaluationSeries(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    sku_id: str
+    product_name: str
+    destination_id: str
+    destination_name: str
+    forecast_method: str
+    data_sufficiency: str
+    sample_count: int
+    total_actual_demand: Optional[float] = None
+    total_predicted_demand: Optional[float] = None
+    mae: Optional[float] = None
+    wape: Optional[float] = None
+    accuracy_percent: Optional[float] = None
+    evaluation_period: Optional[str] = None
+    evaluated_at: datetime
+    points: List[ForecastEvaluationPoint]
+
+
+class ForecastEvaluationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    evaluated_at: datetime
+    horizon_days: int
+    sample_count: int
+    total_actual_demand: Optional[float] = None
+    total_predicted_demand: Optional[float] = None
+    mae: Optional[float] = None
+    wape: Optional[float] = None
+    accuracy_percent: Optional[float] = None
+    evaluation_period: Optional[str] = None
+    data_sufficiency: str
+    model_name: str = "Baseline Statistical Forecast (7-day Rolling Moving Average / Seasonal Naive)"
+    accuracy_formula_note: str = "Forecast accuracy is defined as 100 - WAPE (%). Clamped to 0.0% when WAPE exceeds 100%."
+    series: List[ForecastEvaluationSeries]
+    aligned_timeseries: List[ForecastEvaluationPoint]
+
+
+# --- Distribution Performance KPIs ---
+class DistributionPerformanceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    as_of: datetime
+    run_id: Optional[str] = None
+    period_label: str
+    data_source_mode: str  # 'verified_operational' | 'estimated_plan' | 'simulated'
+
+    # KPI 1: Demand fulfilment rate = fulfilled demand units / eligible demand units * 100
+    demand_fulfilment_rate_percent: float
+    fulfilled_demand_units: float
+    eligible_demand_units: float
+    demand_fulfilment_label: str
+
+    # KPI 2: Transportation cost = recorded transportation cost for the selected period
+    transportation_cost: float
+    transportation_cost_label: str
+    has_recorded_shipments: bool
+
+    # KPI 3: Stockout rate = demand units unfulfilled because of stock unavailability / eligible demand units * 100
+    stockout_rate_percent: float
+    unmet_demand_units: float
+    stockout_rate_label: str
+
+    # KPI 4: Cost reduction = (baseline cost - optimized cost) / baseline cost * 100
+    cost_reduction_percent: float
+    baseline_cost: float
+    optimized_cost: float
+    cost_savings: float
+    cost_reduction_label: str
+

@@ -31,10 +31,12 @@ from app.schemas.planning import (
     ScenarioSimulationResponse,
     PerformanceLifecycleSummary,
     OperationalPerformanceResponse,
+    DistributionPerformanceResponse,
 )
 from app.schemas.network import ShipmentResponse
 from app.services.risk_service import analyze_inventory_risks
 from app.services.expiry_service import allocate_fefo_batches
+from app.services.osrm_service import get_route_distance
 
 
 def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -310,7 +312,15 @@ def run_distribution_optimization(
     inv_query = db.query(InventorySnapshot)
     if request.snapshot_id:
         inv_query = inv_query.filter(InventorySnapshot.snapshot_id == request.snapshot_id)
+    else:
+        # Default to company operational inventory, isolating benchmark datasets
+        inv_query = inv_query.filter(
+            InventorySnapshot.owner_org_id != "BENCHMARK-COMPANY",
+            InventorySnapshot.snapshot_id != "SNAP-BENCHMARK-PUBLIC",
+        )
     inv_records = inv_query.all()
+    if not inv_records and not request.snapshot_id:
+        inv_records = db.query(InventorySnapshot).all()
 
     # Group inventory snapshots by (sku_id, location_id) to avoid double-counting
     as_of_date = now.date()
@@ -593,7 +603,7 @@ def run_distribution_optimization(
             if route.max_shipment_qty is not None and route.max_shipment_qty > 0:
                 eligible_disp = min(eligible_disp, float(route.max_shipment_qty))
 
-            base_cost = float(route.cost_rate) if hasattr(route, 'cost_rate') and route.cost_rate and route.cost_rate > 0 else 3.50
+            base_cost = float(route.cost_rate) if hasattr(route, 'cost_rate') and route.cost_rate is not None and float(route.cost_rate) >= 0.0 else 3.50
             cost = round(base_cost * max(0.01, cost_multiplier), 2)
             arc_idx = len(candidate_arcs)
             candidate_arcs.append((s_id, src_id, d_id, route, cost))
@@ -1172,10 +1182,19 @@ def compare_corridors_for_destination_sku(
         is_dist_owned = owner_org is not None and owner_org.org_type in {"independent_distributor", "distributor"}
 
         dist_km = None
+        dist_source = "not_available"
+        is_verified_road = False
         if src_loc.latitude is not None and dest_loc.latitude is not None:
-            dist_km = haversine_distance_km(src_loc.latitude, src_loc.longitude, dest_loc.latitude, dest_loc.longitude)
+            route_dist_res = get_route_distance(
+                src_loc.latitude, src_loc.longitude, dest_loc.latitude, dest_loc.longitude, allow_network_query=False
+            )
+            dist_km = route_dist_res.get("distance_km")
+            dist_source = route_dist_res.get("routing_engine", "haversine_road_adjusted")
+            is_verified_road = (dist_source == "osrm_open_street_map")
         elif route and route.lead_time_days:
             dist_km = round(float(route.lead_time_days) * 350.0, 1)
+            dist_source = "transit_time_estimate"
+            is_verified_road = False
 
         rejection_reasons = []
         is_feasible = True
@@ -1216,7 +1235,7 @@ def compare_corridors_for_destination_sku(
             status = "insufficient_stock"
             rejection_reasons.append(f"Zero dispatchable unexpired stock at {src_loc.name} (OH: {sum(inv.on_hand for inv in inv_list):.0f}).")
 
-        cost_rate = float(route.cost_rate) if route and route.cost_rate else 3.50
+        cost_rate = float(route.cost_rate) if route and route.cost_rate is not None and float(route.cost_rate) >= 0.0 else 3.50
         handling_rate = 0.50 if src_loc.location_type in {"manufacturing_plant", "company_warehouse", "central_warehouse"} else 0.25
         total_delivered = round(cost_rate + handling_rate, 2)
         lead_days = float(route.lead_time_days) if route and route.lead_time_days else 99.0
@@ -1230,6 +1249,8 @@ def compare_corridors_for_destination_sku(
                 destination_location_name=dest_loc.name,
                 route_id=route.id if route else 0,
                 distance_km=dist_km,
+                distance_source=dist_source,
+                is_verified_road_route=is_verified_road,
                 lead_time_days=lead_days,
                 cost_rate_per_unit=cost_rate,
                 handling_cost_per_unit=handling_rate,
@@ -1379,6 +1400,7 @@ def simulate_what_if_scenario(
         parameters=request.model_dump(),
         baseline_plan={
             "run_id": base_plan.run_id,
+            "total_demand_units": base_plan.total_demand_units,
             "service_level_percent": base_plan.service_level_percent,
             "fulfilled_demand_units": base_plan.fulfilled_demand_units,
             "unmet_demand_units": base_plan.unmet_demand_units,
@@ -1387,6 +1409,7 @@ def simulate_what_if_scenario(
         },
         simulated_plan={
             "run_id": sim_plan.run_id,
+            "total_demand_units": sim_plan.total_demand_units,
             "service_level_percent": sim_plan.service_level_percent,
             "fulfilled_demand_units": sim_plan.fulfilled_demand_units,
             "unmet_demand_units": sim_plan.unmet_demand_units,
@@ -1492,3 +1515,150 @@ def compute_operational_performance_metrics(
         lifecycle_breakdown=breakdown,
         recent_plan_compliance=compliance,
     )
+
+
+# =============================================================================
+# 12. Distribution Performance KPIs (Demand Fulfilment, Transport Cost, Stockout, Cost Reduction)
+# =============================================================================
+
+def compute_distribution_performance_kpis(
+    db: Session,
+    run_id: Optional[str] = None,
+    org_id: Optional[str] = None,
+) -> DistributionPerformanceResponse:
+    """
+    Computes four core Distribution Performance KPIs:
+    1. Demand fulfilment rate = fulfilled demand units / eligible demand units * 100
+    2. Transportation cost = recorded transportation cost for the selected period
+    3. Stockout rate = demand units unfulfilled because of stock unavailability / eligible demand units * 100
+    4. Cost reduction = (baseline cost - optimized cost) / baseline cost * 100
+    """
+    now = datetime.now(timezone.utc)
+
+    # 1. Fetch relevant planning run
+    query = db.query(PlanningRun)
+    if org_id:
+        query = query.filter(PlanningRun.org_id == org_id)
+    if run_id:
+        plan_run = query.filter(PlanningRun.run_id == run_id).first()
+    else:
+        plan_run = query.order_by(PlanningRun.created_at.desc()).first()
+
+    # If no plan exists, return safe defaults
+    if not plan_run:
+        return DistributionPerformanceResponse(
+            as_of=now,
+            run_id=None,
+            period_label="No Historical or Active Plan",
+            data_source_mode="estimated_plan",
+            demand_fulfilment_rate_percent=0.0,
+            fulfilled_demand_units=0.0,
+            eligible_demand_units=0.0,
+            demand_fulfilment_label="Demand Fulfilment Rate (No Planning Runs)",
+            transportation_cost=0.0,
+            transportation_cost_label="No Transportation Data Recorded",
+            has_recorded_shipments=False,
+            stockout_rate_percent=0.0,
+            unmet_demand_units=0.0,
+            stockout_rate_label="Stockout Deficit Rate",
+            cost_reduction_percent=0.0,
+            baseline_cost=0.0,
+            optimized_cost=0.0,
+            cost_savings=0.0,
+            cost_reduction_label="Baseline Comparison Unavailable",
+        )
+
+    # 2. Check for verified operational shipments associated with this run (or organization)
+    shipments_q = db.query(Shipment)
+    if org_id:
+        shipments_q = shipments_q.filter(Shipment.owner_org_id == org_id)
+
+    all_shipments = shipments_q.all()
+    verified_shipments = [
+        s for s in all_shipments
+        if s.status in {"approved", "ready_for_dispatch", "in_transit", "delivered"}
+    ]
+
+    eligible_demand = float(plan_run.total_demand_units or 0.0)
+    fulfilled_demand = float(plan_run.fulfilled_demand_units or 0.0)
+    unmet_demand = float(plan_run.unmet_demand_units or 0.0)
+
+    # KPI 1: Demand fulfilment rate = fulfilled demand units / eligible demand units * 100
+    if eligible_demand > 0:
+        fulfilment_rate = round((fulfilled_demand / eligible_demand) * 100.0, 1)
+        demand_fulfilment_label = "Demand Fulfilment Rate (Fulfilled / Eligible)"
+    else:
+        fulfilment_rate = 100.0
+        demand_fulfilment_label = "Demand Fulfilment Rate (No Active Eligible Demand)"
+
+    # KPI 2: Transportation cost = recorded transportation cost for the selected period
+    has_recorded = len(verified_shipments) > 0
+    if has_recorded:
+        recorded_transport_cost = round(
+            sum(float(s.estimated_transport_cost or 0.0) for s in verified_shipments), 2
+        )
+        transport_label = "Verified Operational (Executed / Approved Shipments)"
+        source_mode = "verified_operational"
+    else:
+        recorded_transport_cost = round(float(plan_run.estimated_transport_cost or 0.0), 2)
+        transport_label = "Estimated (Optimization Plan)"
+        source_mode = "estimated_plan"
+
+    # KPI 3: Stockout rate = demand units unfulfilled because of stock unavailability / eligible demand units * 100
+    stockout_rate = (
+        round((unmet_demand / eligible_demand) * 100.0, 1)
+        if eligible_demand > 0
+        else 0.0
+    )
+    stockout_label = "Stockout Deficit Rate (Unmet / Eligible Demand)"
+
+    # KPI 4: Cost reduction = (baseline cost - optimized cost) / baseline cost * 100
+    baseline_comp = {}
+    if plan_run.baseline_comparison:
+        try:
+            if isinstance(plan_run.baseline_comparison, str):
+                baseline_comp = json.loads(plan_run.baseline_comparison)
+            elif isinstance(plan_run.baseline_comparison, dict):
+                baseline_comp = plan_run.baseline_comparison
+        except Exception:
+            baseline_comp = {}
+
+    baseline_data = baseline_comp.get("baseline", {})
+    optimizer_data = baseline_comp.get("optimizer", {})
+
+    baseline_cost = float(baseline_data.get("estimated_transport_cost") or 0.0)
+    optimized_cost = float(optimizer_data.get("estimated_transport_cost") or plan_run.estimated_transport_cost or 0.0)
+
+    if baseline_cost > 0:
+        cost_reduction = round(((baseline_cost - optimized_cost) / baseline_cost) * 100.0, 1)
+        cost_savings = round(baseline_cost - optimized_cost, 2)
+        cost_reduction_label = f"Savings vs {baseline_data.get('name', 'Nearest-Source Baseline')} (Identical Constraints)"
+    else:
+        cost_reduction = 0.0
+        cost_savings = 0.0
+        cost_reduction_label = "Baseline Cost Comparison (Heuristic Reference)"
+
+    period_str = f"{plan_run.horizon_days}d Plan ({plan_run.created_at.strftime('%Y-%m-%d %H:%M UTC') if plan_run.created_at else 'Recent'})"
+
+    return DistributionPerformanceResponse(
+        as_of=now,
+        run_id=plan_run.run_id,
+        period_label=period_str,
+        data_source_mode=source_mode,
+        demand_fulfilment_rate_percent=fulfilment_rate,
+        fulfilled_demand_units=fulfilled_demand,
+        eligible_demand_units=eligible_demand,
+        demand_fulfilment_label="Demand Fulfilment Rate (Fulfilled / Eligible)",
+        transportation_cost=recorded_transport_cost,
+        transportation_cost_label=transport_label,
+        has_recorded_shipments=has_recorded,
+        stockout_rate_percent=stockout_rate,
+        unmet_demand_units=unmet_demand,
+        stockout_rate_label=stockout_label,
+        cost_reduction_percent=cost_reduction,
+        baseline_cost=round(baseline_cost, 2),
+        optimized_cost=round(optimized_cost, 2),
+        cost_savings=cost_savings,
+        cost_reduction_label=cost_reduction_label,
+    )
+

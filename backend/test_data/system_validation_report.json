@@ -1,0 +1,1525 @@
+{
+  "report_id": "VAL-RUN-986BA70D",
+  "evaluated_at": "2026-10-25T10:19:24.668516+00:00",
+  "overall_test_pass_rate_percent": 100.0,
+  "overall_feature_coverage_percent": 100.0,
+  "overall_verified_coverage_percent": 100.0,
+  "total_passed": 62,
+  "total_failed": 0,
+  "total_warning": 0,
+  "total_blocked": 0,
+  "total_untested": 0,
+  "total_executed": 62,
+  "total_in_scope": 62,
+  "modules": [
+    {
+      "module_id": "warehouse_selection",
+      "name": "Intelligent Warehouse Selection",
+      "category": "Optimization & Solver",
+      "description": "Multi-facility capacity assignment, lowest delivered cost ranking, and distributor inventory protection.",
+      "checks": [
+        {
+          "check_id": "wh-sel-pos-01",
+          "title": "Multi-Warehouse Capacity Constrained Dispatch",
+          "module_id": "warehouse_selection",
+          "module_name": "Intelligent Warehouse Selection",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Selected lowest delivered cost facility WH-A over higher cost facility WH-B",
+          "evidence": {
+            "candidate_count": 2,
+            "selected_facility": "WH-A",
+            "delivered_cost_per_unit": 4.0,
+            "optimization_rule": "min(total_delivered_cost) subject to capacity >= 0"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "wh-sel-neg-01",
+          "title": "Deactivated Facility & Zero Dispatchable Stock Disqualification",
+          "module_id": "warehouse_selection",
+          "module_name": "Intelligent Warehouse Selection",
+          "category": "Optimization & Solver",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Correctly disqualified inactive facility and empty facility from supply candidates",
+          "evidence": {
+            "evaluated_candidates": [
+              "WH-INACTIVE",
+              "WH-EMPTY"
+            ],
+            "eligible_count": 0,
+            "disqualification_reasons": [
+              "facility_deactivated",
+              "zero_dispatchable_stock"
+            ]
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "wh-sel-bnd-01",
+          "title": "Exact Capacity Limit Supply Boundary",
+          "module_id": "warehouse_selection",
+          "module_name": "Intelligent Warehouse Selection",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Exact capacity boundary verified: 100% capacity consumed with 0 surplus and 0 unmet demand",
+          "evidence": {
+            "demand": 500.0,
+            "warehouse_capacity": 500.0,
+            "allocated": 500.0,
+            "remaining_capacity": 0.0,
+            "unmet_demand": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "wh-sel-fail-01",
+          "title": "Distributor-Owned Facility Protection Guard",
+          "module_id": "warehouse_selection",
+          "module_name": "Intelligent Warehouse Selection",
+          "category": "Optimization & Solver",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Distributor-owned facility protected: reallocation rejected to preserve ownership boundary",
+          "evidence": {
+            "facility_id": "WH-DIST-01",
+            "owner_type": "independent_distributor",
+            "access_permitted": false,
+            "policy": "PRD Section 5: Distributor stock cannot be appropriated for general network replenishment"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "stockout_prevention",
+      "name": "Stockout Prevention & Service-First Allocation",
+      "category": "Optimization & Solver",
+      "description": "Lexicographic Stage 1 demand gap minimization, severe shortage prioritization, and negative demand filtering.",
+      "checks": [
+        {
+          "check_id": "stk-prev-pos-01",
+          "title": "Lexicographic Priority 1 Shortage Minimization",
+          "module_id": "stockout_prevention",
+          "module_name": "Stockout Prevention & Service-First Allocation",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Service-first lexicographic priority strictly fulfilled maximum possible demand (850/1000)",
+          "evidence": {
+            "total_demand": 1000.0,
+            "available_stock": 850.0,
+            "allocated_stock": 850.0,
+            "unmet_shortage": 150.0,
+            "shortage_penalty_score": 1500000.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "stk-prev-bnd-01",
+          "title": "Severe Shortage Critical Allocation Boundary",
+          "module_id": "stockout_prevention",
+          "module_name": "Stockout Prevention & Service-First Allocation",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Severe shortage boundary verified: all 50 units allocated, 90.0% critical deficit alerted",
+          "evidence": {
+            "demand": 500.0,
+            "available_stock": 50.0,
+            "allocated": 50.0,
+            "critical_deficit_percent": 90.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "stk-prev-neg-01",
+          "title": "Negative Demand Gap Input Validation",
+          "module_id": "stockout_prevention",
+          "module_name": "Stockout Prevention & Service-First Allocation",
+          "category": "Optimization & Solver",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Negative demand quantity safely rejected with NEGATIVE_QUANTITY validation error",
+          "evidence": {
+            "rejected_value": -120.0,
+            "error_code": "NEGATIVE_QUANTITY",
+            "error_reason": "Field 'demand_gap' cannot be negative (-120.0)."
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "stk-prev-fail-01",
+          "title": "Unserviceable Destination Shortage Accounting",
+          "module_id": "stockout_prevention",
+          "module_name": "Stockout Prevention & Service-First Allocation",
+          "category": "Optimization & Solver",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Unserviceable destination correctly logged with 100% unmet deficit and 0 shipments",
+          "evidence": {
+            "destination_id": "DEST-ISOLATED",
+            "demand": 400.0,
+            "serviceable_corridors": 0,
+            "unmet_deficit": 400.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "excess_inventory_reduction",
+      "name": "Excess Inventory Reduction & Surplus Balancing",
+      "category": "Inventory & Expiry",
+      "description": "Detects surplus stock exceeding target cover days and safely pairs with deficit facilities.",
+      "checks": [
+        {
+          "check_id": "exc-red-pos-01",
+          "title": "Surplus Finished Goods Identification & Pairing",
+          "module_id": "excess_inventory_reduction",
+          "module_name": "Excess Inventory Reduction & Surplus Balancing",
+          "category": "Inventory & Expiry",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Detected 600 surplus units at source facility (45.0 days cover vs 15.0 days target)",
+          "evidence": {
+            "daily_sales_rate": 20.0,
+            "current_on_hand": 900.0,
+            "current_cover_days": 45.0,
+            "target_cover_days": 15.0,
+            "identified_surplus_units": 600.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "exc-red-neg-01",
+          "title": "Sub-Target Facility Disqualification from Donor Pool",
+          "module_id": "excess_inventory_reduction",
+          "module_name": "Excess Inventory Reduction & Surplus Balancing",
+          "category": "Inventory & Expiry",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Facility with 8.0 cover days below target (15.0d) disqualified from surplus donor pool",
+          "evidence": {
+            "current_cover_days": 8.0,
+            "target_cover_days": 15.0,
+            "surplus_units": 0.0,
+            "is_donor_candidate": false
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "exc-red-bnd-01",
+          "title": "Balanced Target Cover Days Inventory Boundary",
+          "module_id": "excess_inventory_reduction",
+          "module_name": "Excess Inventory Reduction & Surplus Balancing",
+          "category": "Inventory & Expiry",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Balanced inventory boundary verified: exactly 0 surplus and 0 deficit at target buffer",
+          "evidence": {
+            "on_hand": 150.0,
+            "target_cover_days": 15.0,
+            "surplus": 0.0,
+            "deficit": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "exc-red-fail-01",
+          "title": "Cross-Organization Redistribution Boundary Guard",
+          "module_id": "excess_inventory_reduction",
+          "module_name": "Excess Inventory Reduction & Surplus Balancing",
+          "category": "Inventory & Expiry",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Cross-organization surplus transfer blocked by multi-tenant governance guard",
+          "evidence": {
+            "source_owner": "ORG-ALPHA",
+            "destination_owner": "ORG-BETA",
+            "transfer_permitted": false,
+            "rule": "Inventory transfers require identical ownership organization or formal wholesale contract"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "route_optimization",
+      "name": "Transportation & Route Optimization",
+      "category": "Logistics & Routing",
+      "description": "Highway distance routing, 1.25 road winding factor, corridor eligibility, and horizon cutoff enforcement.",
+      "checks": [
+        {
+          "check_id": "route-opt-pos-01",
+          "title": "Verified Highway Road Distance Calculation",
+          "module_id": "route_optimization",
+          "module_name": "Transportation & Route Optimization",
+          "category": "Logistics & Routing",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.03,
+          "message": "Calculated verified highway road distance: 150.19 km between Mumbai and Pune",
+          "evidence": {
+            "origin": {
+              "lat": 19.076,
+              "lon": 72.8777,
+              "city": "Mumbai"
+            },
+            "destination": {
+              "lat": 18.5204,
+              "lon": 73.8567,
+              "city": "Pune"
+            },
+            "winding_factor": 1.25,
+            "calculated_distance_km": 150.19
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "route-opt-neg-01",
+          "title": "Inactive Transport Corridor Disqualification",
+          "module_id": "route_optimization",
+          "module_name": "Transportation & Route Optimization",
+          "category": "Logistics & Routing",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Inactive transport route RT-999 rejected from feasible corridor network",
+          "evidence": {
+            "route_id": "RT-999",
+            "is_active": false,
+            "feasibility": "ineligible"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "route-opt-bnd-01",
+          "title": "Co-Located Facility Zero Distance Boundary",
+          "module_id": "route_optimization",
+          "module_name": "Transportation & Route Optimization",
+          "category": "Logistics & Routing",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Co-located coordinates return exactly 0.0 km road distance",
+          "evidence": {
+            "origin": [
+              18.5204,
+              73.8567
+            ],
+            "destination": [
+              18.5204,
+              73.8567
+            ],
+            "distance_km": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "route-opt-fail-01",
+          "title": "Lead Time Exceeding Horizon Threshold Rejection",
+          "module_id": "route_optimization",
+          "module_name": "Transportation & Route Optimization",
+          "category": "Logistics & Routing",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Route with 10d transit lead time rejected against 7d horizon cutoff",
+          "evidence": {
+            "lead_time_days": 10,
+            "horizon_days": 7,
+            "is_feasible": false,
+            "rejection_reason": "transit_lead_time_exceeds_horizon"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "landed_cost_calculation",
+      "name": "Total Landed Cost Optimization",
+      "category": "Optimization & Solver",
+      "description": "Combined purchase price, transport rate, handling fee, and facility type differential accounting.",
+      "checks": [
+        {
+          "check_id": "landed-cost-pos-01",
+          "title": "Total Landed Cost Multi-Component Summation",
+          "module_id": "landed_cost_calculation",
+          "module_name": "Total Landed Cost Optimization",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Total landed cost formula verified: ₹104.00 (Purchase ₹100.00 + Transport ₹3.50 + Handling ₹0.50)",
+          "evidence": {
+            "purchase_price": 100.0,
+            "transport_rate": 3.5,
+            "handling_fee": 0.5,
+            "total_landed_cost": 104.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "landed-cost-neg-01",
+          "title": "Negative Cost Rate Validation Rejection",
+          "module_id": "landed_cost_calculation",
+          "module_name": "Total Landed Cost Optimization",
+          "category": "Optimization & Solver",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Negative transport rate (-5.0) rejected by cost rate validator",
+          "evidence": {
+            "input_value": -5.0,
+            "validation_error": "NEGATIVE_QUANTITY"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "landed-cost-bnd-01",
+          "title": "Zero Transport Rate Internal Transfer Boundary",
+          "module_id": "landed_cost_calculation",
+          "module_name": "Total Landed Cost Optimization",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Zero transport rate boundary computed cleanly without numerical distortion (₹0.25)",
+          "evidence": {
+            "transport_rate": 0.0,
+            "handling_fee": 0.25,
+            "total_cost": 0.25
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "landed-cost-pos-02",
+          "title": "Manufacturing Plant vs Regional Depot Handling Differential",
+          "module_id": "landed_cost_calculation",
+          "module_name": "Total Landed Cost Optimization",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Handling differential applied: Manufacturing Plant (₹0.50/unit) vs Regional Depot (₹0.25/unit)",
+          "evidence": {
+            "manufacturing_plant_handling": 0.5,
+            "regional_depot_handling": 0.25,
+            "differential": 0.25
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "fefo_allocation",
+      "name": "Shelf-Life Optimization using FEFO",
+      "category": "Inventory & Expiry",
+      "description": "First-Expired First-Out priority, expired stock exclusion, minimum shelf-life cutoff, and batch splitting.",
+      "checks": [
+        {
+          "check_id": "fefo-pos-01",
+          "title": "Earliest Expiry Batch Priority Allocation",
+          "module_id": "fefo_allocation",
+          "module_name": "Shelf-Life Optimization using FEFO",
+          "category": "Inventory & Expiry",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.15,
+          "message": "FEFO correctly prioritized earliest expiring batch B-EARLY (20 days remaining)",
+          "evidence": {
+            "demand": 60.0,
+            "allocated_batch": "B-EARLY",
+            "allocated_qty": 60.0,
+            "days_remaining": 20
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "fefo-neg-01",
+          "title": "Expired Finished Goods Absolute Disqualification",
+          "module_id": "fefo_allocation",
+          "module_name": "Shelf-Life Optimization using FEFO",
+          "category": "Inventory & Expiry",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.03,
+          "message": "Expired batch (-5 days remaining) strictly excluded from dispatch allocation",
+          "evidence": {
+            "expired_batch_on_hand": 200.0,
+            "allocated_quantity": 0.0,
+            "unmet_demand": 50.0,
+            "policy": "FEFO zero tolerance: expired finished goods are never dispatched"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "fefo-bnd-01",
+          "title": "Customer Contract Minimum Shelf-Life Boundary",
+          "module_id": "fefo_allocation",
+          "module_name": "Shelf-Life Optimization using FEFO",
+          "category": "Inventory & Expiry",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.03,
+          "message": "Batch with 12d shelf-life rejected against 15d minimum customer contract threshold",
+          "evidence": {
+            "batch_days_remaining": 12,
+            "min_required_shelf_life_days": 15,
+            "allocated_quantity": 0.0,
+            "unmet_demand": 50.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "fefo-fail-01",
+          "title": "Multi-Batch Split & Exhaustion Accounting",
+          "module_id": "fefo_allocation",
+          "module_name": "Shelf-Life Optimization using FEFO",
+          "category": "Inventory & Expiry",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.04,
+          "message": "Multi-batch FEFO split satisfied: Batch A (100 units) + Batch B (50 units) = 150 units",
+          "evidence": {
+            "demand": 150.0,
+            "total_allocated": 150.0,
+            "allocations": [
+              [
+                "B-A",
+                100.0
+              ],
+              [
+                "B-B",
+                50.0
+              ]
+            ]
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "expiry_alerts",
+      "name": "Multi-Tier Expiry Risk Alerts",
+      "category": "Inventory & Expiry",
+      "description": "10-day critical, 30-day high risk, 60-day medium risk classification, and non-alarm healthy thresholds.",
+      "checks": [
+        {
+          "check_id": "exp-alt-pos-01",
+          "title": "Multi-Tier Expiry Risk Classification",
+          "module_id": "expiry_alerts",
+          "module_name": "Multi-Tier Expiry Risk Alerts",
+          "category": "Inventory & Expiry",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.05,
+          "message": "Multi-tier expiry categorization verified across Critical, High, Medium, and Healthy tiers",
+          "evidence": {
+            "critical_batches": 1,
+            "high_risk_batches": 1,
+            "medium_risk_batches": 1,
+            "healthy_batches": 1
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.669073+00:00"
+        },
+        {
+          "check_id": "exp-alt-bnd-01",
+          "title": "Exact 10-Day Critical Risk Threshold Boundary",
+          "module_id": "expiry_alerts",
+          "module_name": "Multi-Tier Expiry Risk Alerts",
+          "category": "Inventory & Expiry",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Exact 10-day boundary test: classified as critical risk alert",
+          "evidence": {
+            "days_remaining": 10,
+            "risk_category": "critical",
+            "threshold": "<= 15 days"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "exp-alt-bnd-02",
+          "title": "Exact 30-Day High Risk Threshold Boundary",
+          "module_id": "expiry_alerts",
+          "module_name": "Multi-Tier Expiry Risk Alerts",
+          "category": "Inventory & Expiry",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Exact 30-day boundary test: classified as high risk alert",
+          "evidence": {
+            "days_remaining": 30,
+            "risk_category": "high",
+            "threshold": "16 to 30 days"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "exp-alt-neg-01",
+          "title": "Fresh Finished Goods Non-Alarm Health Verification",
+          "module_id": "expiry_alerts",
+          "module_name": "Multi-Tier Expiry Risk Alerts",
+          "category": "Inventory & Expiry",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Fresh stock (180 days remaining) classified as healthy with zero false alarms",
+          "evidence": {
+            "days_remaining": 180,
+            "risk_category": "healthy",
+            "is_dispatchable": true
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "demand_forecasting",
+      "name": "Regional Demand Forecasting",
+      "category": "Forecasting & ML",
+      "description": "7-day rolling window run rate, seasonal uplift, insufficient history fallback, and temporal horizon enforcement.",
+      "checks": [
+        {
+          "check_id": "fc-pos-01",
+          "title": "7-Day Rolling Window Demand Rate Calculation",
+          "module_id": "demand_forecasting",
+          "module_name": "Regional Demand Forecasting",
+          "category": "Forecasting & ML",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "7-day rolling moving average computed daily rate of 16.0 units (7d forecast: 112.0 units)",
+          "evidence": {
+            "history_window": [
+              10.0,
+              12.0,
+              14.0,
+              16.0,
+              18.0,
+              20.0,
+              22.0
+            ],
+            "daily_forecast_rate": 16.0,
+            "horizon_7d_total": 112.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "fc-bnd-01",
+          "title": "Insufficient History Fallback Baseline Activation",
+          "module_id": "demand_forecasting",
+          "module_name": "Regional Demand Forecasting",
+          "category": "Forecasting & ML",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Insufficient history fallback activated safely (3 observations < 7 threshold)",
+          "evidence": {
+            "observations_count": 3,
+            "data_sufficiency": "insufficient_history",
+            "fallback_daily_rate": 20.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "fc-neg-01",
+          "title": "Negative Sales Quantity Anomaly Filtering",
+          "module_id": "demand_forecasting",
+          "module_name": "Regional Demand Forecasting",
+          "category": "Forecasting & ML",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Negative sales observation (-40.0) caught by data integrity filter",
+          "evidence": {
+            "rejected_value": -40.0,
+            "error_code": "NEGATIVE_QUANTITY"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "fc-pos-02",
+          "title": "Temporal Horizon Boundary & Zero Future Leakage",
+          "module_id": "demand_forecasting",
+          "module_name": "Regional Demand Forecasting",
+          "category": "Forecasting & ML",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.04,
+          "message": "Strict temporal holdout split verified: zero future data leakage into training window",
+          "evidence": {
+            "train_period": "2026-10-01 to 2026-10-08 (8 days)",
+            "future_period": "2026-10-09 to 2026-10-14 (6 days)",
+            "overlap_count": 0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "mae_wape_evaluation",
+      "name": "ML Model Evaluation (MAE & WAPE)",
+      "category": "Forecasting & ML",
+      "description": "Mean Absolute Error, Weighted Absolute Percentage Error, Forecast Accuracy %, and zero-division handling.",
+      "checks": [
+        {
+          "check_id": "ml-eval-pos-01",
+          "title": "Holdout Sample MAE & WAPE Metric Calculation",
+          "module_id": "mae_wape_evaluation",
+          "module_name": "ML Model Evaluation (MAE & WAPE)",
+          "category": "Forecasting & ML",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.03,
+          "message": "Calculated MAE=4.25 and WAPE=3.7% on matched holdout samples",
+          "evidence": {
+            "actuals": [
+              100.0,
+              120.0,
+              110.0,
+              130.0
+            ],
+            "predicts": [
+              105.0,
+              115.0,
+              112.0,
+              125.0
+            ],
+            "mae": 4.25,
+            "wape_percent": 3.7
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "ml-eval-pos-02",
+          "title": "Forecast Accuracy Percentage Derivation",
+          "module_id": "mae_wape_evaluation",
+          "module_name": "ML Model Evaluation (MAE & WAPE)",
+          "category": "Forecasting & ML",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Forecast accuracy percentage verified: 95.8% (100.0 - 4.2% WAPE)",
+          "evidence": {
+            "wape": 4.2,
+            "accuracy_percent": 95.8
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "ml-eval-bnd-01",
+          "title": "Perfect Forecast Theoretical Upper Boundary",
+          "module_id": "mae_wape_evaluation",
+          "module_name": "ML Model Evaluation (MAE & WAPE)",
+          "category": "Forecasting & ML",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Perfect forecast boundary: MAE = 0.0, WAPE = 0.0%, Accuracy = 100.0%",
+          "evidence": {
+            "mae": 0.0,
+            "wape": 0.0,
+            "accuracy": 100.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "ml-eval-bnd-02",
+          "title": "Zero Actual Demand Division-By-Zero Safeguard",
+          "module_id": "mae_wape_evaluation",
+          "module_name": "ML Model Evaluation (MAE & WAPE)",
+          "category": "Forecasting & ML",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Zero actual demand edge case handled cleanly without division by zero",
+          "evidence": {
+            "total_actual": 0.0,
+            "wape_result": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "actual_vs_predicted",
+      "name": "Actual vs Predicted Demand Alignment",
+      "category": "Forecasting & ML",
+      "description": "Time-series synchronization, contiguous timeline generation, and null future actuals isolation.",
+      "checks": [
+        {
+          "check_id": "avp-pos-01",
+          "title": "Synchronized Time-Series Date Pairing",
+          "module_id": "actual_vs_predicted",
+          "module_name": "Actual vs Predicted Demand Alignment",
+          "category": "Forecasting & ML",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Date-aligned time series pairs 100% synchronized across historical holdout",
+          "evidence": {
+            "sample_points": [
+              {
+                "date": "2026-10-18",
+                "actual": 45.0,
+                "predicted": 44.0
+              },
+              {
+                "date": "2026-10-19",
+                "actual": 50.0,
+                "predicted": 49.0
+              },
+              {
+                "date": "2026-10-20",
+                "actual": 52.0,
+                "predicted": 53.0
+              }
+            ],
+            "paired_dates_count": 3
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "avp-neg-01",
+          "title": "Future Forecast Period Actual Demand Null Isolation",
+          "module_id": "actual_vs_predicted",
+          "module_name": "Actual vs Predicted Demand Alignment",
+          "category": "Forecasting & ML",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Future forecast horizon strictly holds actual_demand = None (prevents fabricating future sales)",
+          "evidence": {
+            "future_point": {
+              "date": "2026-10-26",
+              "actual_demand": null,
+              "predicted_demand": 55.0,
+              "is_future": true
+            }
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "avp-bnd-01",
+          "title": "Single SKU-Destination Scope Boundary Isolation",
+          "module_id": "actual_vs_predicted",
+          "module_name": "Actual vs Predicted Demand Alignment",
+          "category": "Forecasting & ML",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Evaluation scope isolated strictly to requested SKU and destination corridor",
+          "evidence": {
+            "sku_id": "SKU-ATTA-01",
+            "destination_id": "LOC-DIST-01",
+            "isolated": true
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        }
+      ],
+      "passed_checks": 3,
+      "executed_checks": 3,
+      "total_in_scope_checks": 3,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "distribution_metrics",
+      "name": "Distribution Performance KPIs",
+      "category": "Optimization & Solver",
+      "description": "Demand fulfilment rate %, stockout deficit %, total transport expenditure, and baseline metrics.",
+      "checks": [
+        {
+          "check_id": "dist-met-pos-01",
+          "title": "Demand Fulfilment Rate Percentage Metric",
+          "module_id": "distribution_metrics",
+          "module_name": "Distribution Performance KPIs",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Demand fulfilment rate KPI computed: 94.0% (940.0/1000.0)",
+          "evidence": {
+            "total_demand": 1000.0,
+            "total_allocated": 940.0,
+            "fulfilment_rate_percent": 94.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "dist-met-pos-02",
+          "title": "Stockout Deficit Rate Percentage Metric",
+          "module_id": "distribution_metrics",
+          "module_name": "Distribution Performance KPIs",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Stockout deficit rate KPI computed: 6.0% (60.0 unmet units)",
+          "evidence": {
+            "unmet_shortage": 60.0,
+            "deficit_rate_percent": 6.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "dist-met-pos-03",
+          "title": "Total Transport Expenditure Aggregation",
+          "module_id": "distribution_metrics",
+          "module_name": "Distribution Performance KPIs",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Total transport expenditure computed: ₹3,450.00",
+          "evidence": {
+            "allocations_count": 2,
+            "total_transport_cost": 3450.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "dist-met-bnd-01",
+          "title": "100% Demand Fulfilment Upper Boundary",
+          "module_id": "distribution_metrics",
+          "module_name": "Distribution Performance KPIs",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "100% fulfilment boundary: exactly 100.0% fulfilled and 0.0% stockout deficit",
+          "evidence": {
+            "fulfilment_rate": 100.0,
+            "deficit_rate": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "what_if_simulation",
+      "name": "What-If Scenario Simulation",
+      "category": "Optimization & Solver",
+      "description": "Dry-run scenario analysis: demand surge multipliers, fuel escalations, and parameter validation.",
+      "checks": [
+        {
+          "check_id": "whatif-pos-01",
+          "title": "+30% Demand Surge Dry-Run Simulation Safety",
+          "module_id": "what_if_simulation",
+          "module_name": "What-If Scenario Simulation",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Simulated +30% demand surge in dry-run mode (500 -> 650 units) without mutating DB state",
+          "evidence": {
+            "base_demand": 500.0,
+            "demand_multiplier": 1.3,
+            "simulated_demand": 650.0,
+            "dry_run_safety": true
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "whatif-pos-02",
+          "title": "+20% Fuel Escalation Landed Cost Sensitivity",
+          "module_id": "what_if_simulation",
+          "module_name": "What-If Scenario Simulation",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Simulated +20% fuel cost escalation: base rate ₹4.00 increased to ₹4.80/unit (+20.0%)",
+          "evidence": {
+            "base_transport_rate": 4.0,
+            "simulated_transport_rate": 4.8,
+            "cost_delta_percent": 20.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.670167+00:00"
+        },
+        {
+          "check_id": "whatif-neg-01",
+          "title": "Negative Simulation Multiplier Parameter Validation",
+          "module_id": "what_if_simulation",
+          "module_name": "What-If Scenario Simulation",
+          "category": "Optimization & Solver",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Negative simulation multiplier (-0.5) rejected by parameter validator",
+          "evidence": {
+            "input_value": -0.5,
+            "validation_error": "NEGATIVE_QUANTITY"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "whatif-bnd-01",
+          "title": "Neutral Multiplier Baseline Invariance Boundary",
+          "module_id": "what_if_simulation",
+          "module_name": "What-If Scenario Simulation",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Neutral simulation boundary (1.0x) yields exact 0.0% metric variance",
+          "evidence": {
+            "base_cost": 10000.0,
+            "simulated_cost": 10000.0,
+            "delta_percent": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "explainability",
+      "name": "Explainability & Decision Receipts",
+      "category": "Optimization & Solver",
+      "description": "Cryptographic Decision Receipts, mathematical rejection reasons, and binding constraint explanations.",
+      "checks": [
+        {
+          "check_id": "exp-pos-01",
+          "title": "Cryptographic Decision Receipt Generation & Hashing",
+          "module_id": "explainability",
+          "module_name": "Explainability & Decision Receipts",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.04,
+          "message": "Generated Decision Receipt rcpt-5a44cf3b with verified solver evidence",
+          "evidence": {
+            "receipt_id": "rcpt-5a44cf3b",
+            "solver_status": "optimal",
+            "solver_engine": "ortools_linear_solver",
+            "objective_value": 4520.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "exp-pos-02",
+          "title": "Infeasible Corridor Mathematical Rejection Logging",
+          "module_id": "explainability",
+          "module_name": "Explainability & Decision Receipts",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Documented transparent mathematical rejection rationale for infeasible corridor",
+          "evidence": {
+            "corridor": "WH-CHENNAI -> DEST-DELHI",
+            "rejection_reason": "Transit lead time (6d) exceeds maximum allowed threshold (4d)"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "exp-pos-03",
+          "title": "Binding Capacity Bottleneck Shadow Cost Explanation",
+          "module_id": "explainability",
+          "module_name": "Explainability & Decision Receipts",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Identified binding constraint bottleneck: source inventory exhaustion at WH-MUMBAI-01",
+          "evidence": {
+            "binding_constraint": "source_inventory_exhaustion",
+            "exhausted_quantity": 1200.0,
+            "shadow_price": 14.5
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "exp-fail-01",
+          "title": "Infeasibility Certificate & Root Cause Explanation",
+          "module_id": "explainability",
+          "module_name": "Explainability & Decision Receipts",
+          "category": "Optimization & Solver",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Infeasibility diagnosis generated: mathematically explains 200 units deficit bottleneck",
+          "evidence": {
+            "solver_status": "infeasible",
+            "diagnostic_explanation": "Total network supply (400 units) strictly less than total demand (600 units)",
+            "unfulfillable_deficit": 200.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "data_imports",
+      "name": "Data Ingestion & Import Validation",
+      "category": "Data Pipeline & Governance",
+      "description": "Row-level schema validation, negative quantity rejection, missing field detection, and atomic rollback.",
+      "checks": [
+        {
+          "check_id": "imp-pos-01",
+          "title": "Valid CSV/Excel Record Schema Parsing & Type Casting",
+          "module_id": "data_imports",
+          "module_name": "Data Ingestion & Import Validation",
+          "category": "Data Pipeline & Governance",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Parsed and validated inventory ingestion record cleanly into numeric types",
+          "evidence": {
+            "raw_record": {
+              "sku_id": "SKU-OIL-01",
+              "on_hand": "150.0",
+              "reserved": "20.0"
+            },
+            "parsed_on_hand": 150.0,
+            "parsed_reserved": 20.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "imp-neg-01",
+          "title": "Row-Level Negative Quantity Rejection Code",
+          "module_id": "data_imports",
+          "module_name": "Data Ingestion & Import Validation",
+          "category": "Data Pipeline & Governance",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Row 5 negative quantity rejected with row-level NEGATIVE_QUANTITY error code",
+          "evidence": {
+            "row_index": 5,
+            "rejected_value": "-50.0",
+            "error_code": "NEGATIVE_QUANTITY"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "imp-neg-02",
+          "title": "Mandatory Field Omission Line Number Tracking",
+          "module_id": "data_imports",
+          "module_name": "Data Ingestion & Import Validation",
+          "category": "Data Pipeline & Governance",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Row 12 empty mandatory field caught with MISSING_FIELD error code",
+          "evidence": {
+            "row_index": 12,
+            "error_code": "MISSING_FIELD"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "imp-fail-01",
+          "title": "Batch Validation Failure Atomic Transaction Rollback",
+          "module_id": "data_imports",
+          "module_name": "Data Ingestion & Import Validation",
+          "category": "Data Pipeline & Governance",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.02,
+          "message": "Atomic rollback verified: batch failure rolls back all records, preventing corrupted state",
+          "evidence": {
+            "total_batch_rows": 2,
+            "committed_rows_after_rollback": 0,
+            "status": "rolled_back"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "baseline_comparison",
+      "name": "Optimizer vs Nearest-Source Benchmark",
+      "category": "Optimization & Solver",
+      "description": "Linear programming vs greedy nearest-source heuristic, cost delta %, and transit km savings.",
+      "checks": [
+        {
+          "check_id": "base-pos-01",
+          "title": "Optimizer Cost Reduction vs Nearest-Source Baseline",
+          "module_id": "baseline_comparison",
+          "module_name": "Optimizer vs Nearest-Source Benchmark",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Optimizer reduced total delivered cost by 18.0% (₹2,250.00) vs nearest-source baseline",
+          "evidence": {
+            "baseline_greedy_cost": 12500.0,
+            "optimizer_linear_cost": 10250.0,
+            "cost_savings": 2250.0,
+            "cost_savings_percent": 18.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "base-pos-02",
+          "title": "Fleet Transit Distance Savings Percentage",
+          "module_id": "baseline_comparison",
+          "module_name": "Optimizer vs Nearest-Source Benchmark",
+          "category": "Optimization & Solver",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Fleet transit distance reduced by 15.0% (630 km saved)",
+          "evidence": {
+            "baseline_distance_km": 4200.0,
+            "optimizer_distance_km": 3570.0,
+            "distance_saved_km": 630.0,
+            "distance_reduction_percent": 15.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "base-bnd-01",
+          "title": "Identical Cost Scenario Zero Delta Boundary",
+          "module_id": "baseline_comparison",
+          "module_name": "Optimizer vs Nearest-Source Benchmark",
+          "category": "Optimization & Solver",
+          "check_type": "boundary",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Identical cost boundary: accurately reports 0.0% cost improvement",
+          "evidence": {
+            "baseline_cost": 8000.0,
+            "optimizer_cost": 8000.0,
+            "savings_percent": 0.0
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        }
+      ],
+      "passed_checks": 3,
+      "executed_checks": 3,
+      "total_in_scope_checks": 3,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    },
+    {
+      "module_id": "security_governance",
+      "name": "Multi-Tenant RBAC & Shipment Governance",
+      "category": "Data Pipeline & Governance",
+      "description": "Organization data isolation, shipment state machine enforcement, and duplicate dispatch prevention.",
+      "checks": [
+        {
+          "check_id": "gov-pos-01",
+          "title": "Multi-Tenant Organization Data Isolation Boundary",
+          "module_id": "security_governance",
+          "module_name": "Multi-Tenant RBAC & Shipment Governance",
+          "category": "Data Pipeline & Governance",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Tenant data boundary verified: access restricted strictly to user's authorized organization",
+          "evidence": {
+            "user_org": "ORG-TATA-CONSUMER",
+            "record_owner": "ORG-TATA-CONSUMER",
+            "access_granted": true
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "gov-neg-01",
+          "title": "Illegal Lifecycle State Transition Guard",
+          "module_id": "security_governance",
+          "module_name": "Multi-Tenant RBAC & Shipment Governance",
+          "category": "Data Pipeline & Governance",
+          "check_type": "negative",
+          "status": "passed",
+          "execution_time_ms": 0.01,
+          "message": "Illegal state transition (proposed -> delivered) rejected by logistics state machine",
+          "evidence": {
+            "current_state": "proposed",
+            "attempted_state": "delivered",
+            "permitted_transitions": [
+              "approved",
+              "rejected",
+              "cancelled"
+            ],
+            "is_valid": false
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "gov-fail-01",
+          "title": "Duplicate In-Transit Shipment Re-Dispatch Prevention",
+          "module_id": "security_governance",
+          "module_name": "Multi-Tenant RBAC & Shipment Governance",
+          "category": "Data Pipeline & Governance",
+          "check_type": "failure_case",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Re-dispatch of in-transit shipment blocked (prevents duplicate inventory deductions)",
+          "evidence": {
+            "current_state": "in_transit",
+            "attempted_action": "ready_for_dispatch",
+            "is_permitted": false
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        },
+        {
+          "check_id": "gov-pos-02",
+          "title": "Two-Step Human Governance Approval Workflow",
+          "module_id": "security_governance",
+          "module_name": "Multi-Tenant RBAC & Shipment Governance",
+          "category": "Data Pipeline & Governance",
+          "check_type": "positive",
+          "status": "passed",
+          "execution_time_ms": 0.0,
+          "message": "Human governance workflow validated: proposal requires explicit approval before dispatch preparation",
+          "evidence": {
+            "step_1": "proposed -> approved (permitted)",
+            "step_2": "approved -> ready_for_dispatch (permitted)"
+          },
+          "error_detail": null,
+          "tested_at": "2026-10-25T10:19:24.671154+00:00"
+        }
+      ],
+      "passed_checks": 4,
+      "executed_checks": 4,
+      "total_in_scope_checks": 4,
+      "failed_checks": 0,
+      "warning_checks": 0,
+      "blocked_checks": 0,
+      "untested_checks": 0,
+      "test_pass_rate_percent": 100.0,
+      "feature_coverage_percent": 100.0,
+      "verified_coverage_percent": 100.0,
+      "status": "passing"
+    }
+  ],
+  "last_validation_timestamp": "Oct 25, 2026, 10:19:24 AM UTC"
+}

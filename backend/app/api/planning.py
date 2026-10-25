@@ -19,9 +19,14 @@ from app.schemas.planning import (
     ScenarioSimulationRequest,
     ScenarioSimulationResponse,
     OperationalPerformanceResponse,
+    ForecastEvaluationResponse,
+    DistributionPerformanceResponse,
 )
 from app.schemas.network import ShipmentResponse
-from app.services.forecast_service import compute_demand_forecast
+from app.services.forecast_service import (
+    compute_demand_forecast,
+    compute_forecast_evaluation,
+)
 from app.services.risk_service import analyze_inventory_risks
 from app.services.optimizer_service import (
     run_distribution_optimization,
@@ -29,6 +34,7 @@ from app.services.optimizer_service import (
     compare_corridors_for_destination_sku,
     simulate_what_if_scenario,
     compute_operational_performance_metrics,
+    compute_distribution_performance_kpis,
 )
 from app.core.security import AuthenticatedUser, require_roles
 
@@ -56,6 +62,35 @@ def get_demand_forecast(
         sku_id=sku_id,
         destination_id=destination_id,
     )
+
+
+@router.get(
+    "/forecast/evaluation",
+    response_model=ForecastEvaluationResponse,
+    summary="Evaluate ML forecast model against historical holdout data",
+)
+def get_forecast_evaluation(
+    horizon_days: int = Query(7, ge=1, le=30, description="Planning horizon in days"),
+    sku_id: Optional[str] = Query(None, description="Optional SKU ID filter"),
+    destination_id: Optional[str] = Query(None, description="Optional destination location ID filter"),
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles(["admin", "planner", "logistics", "viewer"])),
+):
+    """
+    ML Model Evaluation and Actual vs Predicted Demand Comparison:
+    - Compares actual demand and predicted demand using matched SKU, location, and date records.
+    - Evaluates chronological holdout split preventing data leakage.
+    - Computes MAE (mean absolute error), WAPE (weighted absolute percentage error), and forecast accuracy (100 - WAPE).
+    - Future dates strictly contain predicted demand with actual demand marked pending (no invented observations).
+    - Returns data sufficiency classification (sufficient, insufficient_history, zero_demand).
+    """
+    return compute_forecast_evaluation(
+        db,
+        horizon_days=horizon_days,
+        sku_id=sku_id,
+        destination_id=destination_id,
+    )
+
 
 
 @router.get("/risk/analysis", response_model=RiskAnalysisResponse, summary="Analyze inventory risks and stockout exposure")
@@ -513,5 +548,33 @@ def get_operational_performance(
         db=db,
         org_id=current_user.org_id,
     )
+
+
+@router.get(
+    "/optimization/distribution-performance",
+    response_model=DistributionPerformanceResponse,
+    summary="Compute four core distribution performance KPIs",
+)
+def get_distribution_performance_kpis(
+    run_id: Optional[str] = Query(None, description="Optional planning run ID filter"),
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles(["admin", "planner", "logistics", "viewer"])),
+):
+    """
+    Computes four core Distribution Performance KPIs:
+    1. Demand fulfilment rate = fulfilled demand units / eligible demand units * 100
+    2. Transportation cost = recorded transportation cost for the selected period
+    3. Stockout rate = demand units unfulfilled because of stock unavailability / eligible demand units * 100
+    4. Cost reduction = (baseline cost - optimized cost) / baseline cost * 100
+    
+    Distinguishes verified operational execution records from estimated optimization plans.
+    Compares baseline and optimized plan over equivalent demand, dates, and constraints.
+    """
+    return compute_distribution_performance_kpis(
+        db=db,
+        run_id=run_id,
+        org_id=current_user.org_id,
+    )
+
 
 

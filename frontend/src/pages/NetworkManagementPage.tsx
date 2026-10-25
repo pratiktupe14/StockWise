@@ -34,6 +34,7 @@ import {
   updateNetworkLocation,
   getAdminUsers,
 } from '../services/api';
+import { useDatasetSync } from '../services/dataSync';
 import type {
   OrganizationItem,
   LocationItem,
@@ -161,6 +162,12 @@ export const NetworkManagementPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const syncInfo = useDatasetSync(['organizations', 'locations', 'routes', 'products'], fetchData);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
@@ -368,6 +375,11 @@ export const NetworkManagementPage: React.FC = () => {
                 Phase 2 FMCG Architecture
               </span>
               <span className="text-xs text-slate-500">• Permitted Multi-Echelon Network</span>
+              {syncInfo.formattedSyncTime && (
+                <span className="px-2 py-0.5 rounded-sm bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                  Synced {syncInfo.formattedSyncTime} ({syncInfo.dataset})
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-bold text-slate-900 mt-1">Real-World Distribution Network Design</h2>
             <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl">

@@ -178,6 +178,8 @@ async def upload_dataset(
     run_id = f"IMP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
     filename = file.filename or "unknown"
     snapshot_id = None
+    inserted_rows = 0
+    updated_rows = 0
 
     valid_records = []
     validation_errors = []
@@ -193,8 +195,10 @@ async def upload_dataset(
                 existing.unit = rec["unit"]
                 existing.case_pack = rec["case_pack"]
                 existing.shelf_life_days = rec["shelf_life_days"]
+                updated_rows += 1
             else:
                 db.add(Product(**rec))
+                inserted_rows += 1
 
     elif norm_type == "organizations":
         valid_records, validation_errors = validate_organizations_dataset(rows, db)
@@ -206,12 +210,19 @@ async def upload_dataset(
                 existing.contact_email = rec.get("contact_email")
                 existing.contact_phone = rec.get("contact_phone")
                 existing.is_active = rec.get("is_active", True)
+                updated_rows += 1
             else:
                 db.add(Organization(**rec))
+                inserted_rows += 1
 
     elif norm_type == "locations":
         valid_records, validation_errors = validate_locations_dataset(rows, db)
         for rec in valid_records:
+            if not rec.get("owner_org_id"):
+                rec["owner_org_id"] = current_user.org_id or "ORG-FMCG-CORP"
+            if not rec.get("operator_org_id"):
+                rec["operator_org_id"] = rec["owner_org_id"]
+
             if current_user.role != "admin" and rec.get("owner_org_id") and rec["owner_org_id"] != current_user.org_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -231,14 +242,19 @@ async def upload_dataset(
                 existing.latitude = rec.get("latitude")
                 existing.longitude = rec.get("longitude")
                 existing.is_active = rec.get("is_active", True)
+                updated_rows += 1
             else:
                 db.add(Location(**rec))
+                inserted_rows += 1
 
     elif norm_type == "inventory":
         valid_records, validation_errors = validate_inventory_dataset(rows, db)
         if valid_records:
             snapshot_id = valid_records[0].get("snapshot_id") or "SNAP-DEFAULT"
         for rec in valid_records:
+            if not rec.get("owner_org_id"):
+                rec["owner_org_id"] = current_user.org_id or "ORG-FMCG-CORP"
+
             # Enforce that non-admins can only import stock for their assigned org
             if current_user.role != "admin":
                 if rec.get("owner_org_id") and rec["owner_org_id"] != current_user.org_id:
@@ -246,8 +262,6 @@ async def upload_dataset(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail=f"Forbidden: Cannot import stock for external organization '{rec.get('owner_org_id')}'.",
                     )
-                if not rec.get("owner_org_id"):
-                    rec["owner_org_id"] = current_user.org_id
 
             existing = db.query(InventorySnapshot).filter(
                 InventorySnapshot.snapshot_id == rec["snapshot_id"],
@@ -263,8 +277,10 @@ async def upload_dataset(
                 existing.owner_org_id = rec.get("owner_org_id")
                 existing.batch_number = rec.get("batch_number")
                 existing.expiry_date = rec.get("expiry_date")
+                updated_rows += 1
             else:
                 db.add(InventorySnapshot(**rec))
+                inserted_rows += 1
 
     elif norm_type == "sales":
         valid_records, validation_errors = validate_sales_dataset(rows, db)
@@ -276,12 +292,17 @@ async def upload_dataset(
             ).first()
             if existing:
                 existing.quantity = rec["quantity"]
+                updated_rows += 1
             else:
                 db.add(SalesHistory(**rec))
+                inserted_rows += 1
 
     elif norm_type == "routes":
         valid_records, validation_errors = validate_routes_dataset(rows, db)
         for rec in valid_records:
+            if not rec.get("carrier_agency_id"):
+                rec["carrier_agency_id"] = current_user.org_id or "ORG-LOGISTICS-3PL"
+
             existing = db.query(Route).filter(
                 Route.from_location_id == rec["from_location_id"],
                 Route.to_location_id == rec["to_location_id"],
@@ -297,8 +318,10 @@ async def upload_dataset(
                 existing.max_shipment_qty = rec.get("max_shipment_qty")
                 existing.is_active = rec.get("is_active", True)
                 existing.status_notes = rec.get("status_notes")
+                updated_rows += 1
             else:
                 db.add(Route(**rec))
+                inserted_rows += 1
 
     # Determine status
     total_rows = len(rows)
@@ -361,6 +384,9 @@ async def upload_dataset(
         total_rows=import_run.total_rows,
         valid_rows=import_run.valid_rows,
         rejected_rows=import_run.rejected_rows,
+        inserted_rows=inserted_rows,
+        updated_rows=updated_rows,
+        skipped_rows=0,
         status=import_run.status,
         snapshot_id=import_run.snapshot_id,
         created_at=import_run.created_at,
@@ -411,6 +437,95 @@ def list_import_runs(
         )
 
     return ImportRunListResponse(total_runs=total, runs=response_runs)
+
+
+# --- Phase 5: Dataset Readiness & Traceable Public Dataset Sources ---
+
+@router.get("/readiness", summary="Get comprehensive dataset sources and readiness status")
+def get_dataset_readiness(
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles(["admin", "planner", "logistics", "viewer"])),
+):
+    """
+    Returns the comprehensive readiness status of all public datasets and operational data in StockWise.
+    Shows source, coverage, category, import status, record counts, license, downstream features,
+    and missing required operational datasets.
+    """
+    from app.services.dataset_service import get_dataset_registry_and_readiness
+    return get_dataset_registry_and_readiness(db)
+
+
+@router.post("/benchmarks/ingest", summary="Ingest public benchmark dataset reproducibly")
+def ingest_benchmark_dataset(
+    dataset_id: str = Query("all", description="Dataset identifier: 'all', 'osm_india_network', 'uci_online_retail'"),
+    force_reload: bool = Query(False, description="Whether to overwrite existing records"),
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles(["admin", "planner"])),
+):
+    """
+    Reproducibly executes the dataset ingestion pipeline for permitted public datasets:
+    - OpenStreetMap verified Indian FMCG logistics nodes & OSRM road routes
+    - UCI Online Retail II real products, filtered sales time series & FEFO inventory balances
+    All benchmark records are isolated under BENCHMARK-COMPANY and SNAP-BENCHMARK-PUBLIC.
+    """
+    from app.services.dataset_service import (
+        ingest_osm_india_network,
+        ingest_uci_online_retail_benchmark,
+    )
+
+    results = {}
+    norm_id = dataset_id.lower().strip()
+
+    if norm_id in ("all", "osm_india_network"):
+        results["osm_india_network"] = ingest_osm_india_network(db, force_reload=force_reload)
+
+    if norm_id in ("all", "uci_online_retail"):
+        results["uci_online_retail"] = ingest_uci_online_retail_benchmark(db, force_reload=force_reload)
+
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown benchmark dataset '{dataset_id}'. Supported: 'all', 'osm_india_network', 'uci_online_retail'",
+        )
+
+    total_records = 0
+    for k, v in results.items():
+        if isinstance(v, dict):
+            total_records += (
+                v.get("records_ingested")
+                or v.get("routes_ingested")
+                or v.get("sales_ingested")
+                or v.get("locations_ingested")
+                or v.get("total_ingested")
+                or 0
+            )
+
+    return {
+        "status": "completed",
+        "authorized_user": current_user.user_id,
+        "message": f"Successfully processed benchmark dataset '{dataset_id}'. Ingested {total_records} records.",
+        "records_ingested": total_records,
+        "results": results,
+    }
+
+
+@router.get("/benchmarks/sources/{source_id}", summary="Get detailed source documentation and blocker status")
+def get_benchmark_source_detail(
+    source_id: str,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_roles(["admin", "planner", "logistics", "viewer"])),
+):
+    """Retrieves full documentation, licensing, checksums, and blocker details for a specific public dataset."""
+    from app.services.dataset_service import get_dataset_registry_and_readiness
+    readiness = get_dataset_registry_and_readiness(db)
+    for src in readiness.get("sources", []):
+        if src.get("id") == source_id.lower().strip():
+            return src
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Benchmark dataset source '{source_id}' not found.",
+    )
 
 
 @router.get("/{run_id}", response_model=ImportRunSummaryResponse, summary="Get import run details")
@@ -502,4 +617,5 @@ def download_import_run_errors_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=StockWise_import_errors_{run_id}.csv"}
     )
+
 

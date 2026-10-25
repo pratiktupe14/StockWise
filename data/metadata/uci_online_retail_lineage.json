@@ -1,0 +1,36 @@
+{
+  "dataset_name": "UCI Online Retail II",
+  "canonical_source_url": "https://archive.ics.uci.edu/dataset/502/online+retail+ii",
+  "download_url": "https://huggingface.co/datasets/michaelmallari/online-retail/resolve/main/online-retail.xlsx",
+  "download_timestamp": "2026-10-25T04:52:23.579923+00:00",
+  "license": "CC BY 4.0 (Creative Commons Attribution 4.0 International)",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Chen, D. (2012). Online Retail II. UCI Machine Learning Repository. DOI: 10.24432/C5CG6D",
+  "file_checksum_sha256": "43465a06f2ccf7c8b5bd2892bc7defb52f97487934fe93b16ae4c3936424676d",
+  "file_size_bytes": 23715344,
+  "total_raw_rows": 541909,
+  "quarantined_cancellations": 10624,
+  "accepted_valid_rows": 529225,
+  "curated_products_count": 50,
+  "curated_sales_records_count": 14235,
+  "date_range_start": "2010-12-01",
+  "date_range_end": "2011-12-09",
+  "destination_nodes": [
+    "RET-AHMEDABAD-W",
+    "RET-BENGALURU-URBAN",
+    "RET-CHENNAI-NORTH",
+    "RET-DELHI-CENTRAL",
+    "RET-HYDERABAD-SEC",
+    "RET-KOLKATA-EAST",
+    "RET-MUMBAI-SOUTH",
+    "RET-PUNE-METRO"
+  ],
+  "transformation_pipeline": [
+    "HTTP stream acquisition to data/downloads/online-retail.xlsx",
+    "SHA-256 integrity hash verification",
+    "Invoice 'C' and negative quantity segregation to cancellations audit report",
+    "Non-product internal charges filtered (POST, D, M, etc.)",
+    "Aggregation of hourly transactions into daily sales by SKU and destination corridor",
+    "Top 50 high-frequency FMCG SKUs mapped to canonical Product schema with case_pack=12 and shelf_life=180"
+  ]
+}

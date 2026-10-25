@@ -43,12 +43,25 @@ def analyze_inventory_risks(
     inv_query = db.query(InventorySnapshot)
     if snapshot_id:
         inv_query = inv_query.filter(InventorySnapshot.snapshot_id == snapshot_id.strip())
+    else:
+        # Default to company operational inventory, isolating benchmark datasets
+        inv_query = inv_query.filter(
+            InventorySnapshot.owner_org_id != "BENCHMARK-COMPANY",
+            InventorySnapshot.snapshot_id != "SNAP-BENCHMARK-PUBLIC",
+        )
     if destination_id:
         inv_query = inv_query.filter(InventorySnapshot.location_id == destination_id.strip())
     if sku_id:
         inv_query = inv_query.filter(InventorySnapshot.sku_id == sku_id.strip())
 
     inv_records = inv_query.all()
+    if not inv_records and not snapshot_id:
+        fallback_query = db.query(InventorySnapshot)
+        if destination_id:
+            fallback_query = fallback_query.filter(InventorySnapshot.location_id == destination_id.strip())
+        if sku_id:
+            fallback_query = fallback_query.filter(InventorySnapshot.sku_id == sku_id.strip())
+        inv_records = fallback_query.all()
 
     # Group inventory by (sku_id, location_id)
     inv_by_node: Dict[Tuple[str, str], InventorySnapshot] = {

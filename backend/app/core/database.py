@@ -65,14 +65,74 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def ensure_default_organizations() -> None:
+    """
+    Ensures default core organizations exist in the database (e.g. ORG-FMCG-CORP, ORG-LOGISTICS-3PL, etc.)
+    without clearing, resetting, or altering existing records.
+    Safely links any unassigned legacy operational inventory or locations to ORG-FMCG-CORP.
+    """
+    import sys
+    if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+
+    from app.models.entities import Organization
+    default_orgs = [
+        {
+            "org_id": "ORG-FMCG-CORP",
+            "name": "StockWise FMCG Corp",
+            "org_type": "fmcg_company",
+            "contact_email": "operations@stockwise.internal",
+            "contact_phone": "+91-22-67890001",
+            "is_active": True,
+        },
+        {
+            "org_id": "ORG-LOGISTICS-3PL",
+            "name": "Express Logistics 3PL Network",
+            "org_type": "logistics_provider",
+            "contact_email": "fleet@stockwise.internal",
+            "contact_phone": "+91-22-67890002",
+            "is_active": True,
+        },
+        {
+            "org_id": "ORG-DIST-WEST",
+            "name": "Western India Distributors",
+            "org_type": "distributor",
+            "contact_email": "orders@distwest.internal",
+            "contact_phone": "+91-20-67890003",
+            "is_active": True,
+        },
+        {
+            "org_id": "ORG-RETAIL-METRO",
+            "name": "Metro Retail Destinations Hub",
+            "org_type": "retailer",
+            "contact_email": "store@metroretail.internal",
+            "contact_phone": "+91-11-67890004",
+            "is_active": True,
+        },
+    ]
+    try:
+        with SessionLocal() as db:
+            for org_data in default_orgs:
+                existing = db.query(Organization).filter(Organization.org_id == org_data["org_id"]).first()
+                if not existing:
+                    db.add(Organization(**org_data))
+            # Safely associate unassigned operational inventory and locations with ORG-FMCG-CORP
+            db.execute(text("UPDATE inventory_snapshots SET owner_org_id = 'ORG-FMCG-CORP' WHERE owner_org_id IS NULL AND snapshot_id != 'SNAP-BENCHMARK-PUBLIC'"))
+            db.execute(text("UPDATE locations SET owner_org_id = 'ORG-FMCG-CORP', operator_org_id = 'ORG-FMCG-CORP' WHERE owner_org_id IS NULL AND location_id NOT LIKE 'WH-%'"))
+            db.commit()
+    except Exception:
+        pass
+
+
 def init_db() -> None:
     """
-    Creates database tables for local SQLite development.
+    Creates database tables for local SQLite development and bootstraps default core tenant organizations.
     For PostgreSQL / Supabase, schema is managed strictly via Alembic migrations.
     """
     if settings.DATABASE_URL.startswith("sqlite"):
         import app.models.entities  # Ensure models are imported
         Base.metadata.create_all(bind=engine)
+    ensure_default_organizations()
 
 
 def check_database_connection() -> Dict[str, Any]:

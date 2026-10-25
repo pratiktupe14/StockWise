@@ -15,6 +15,7 @@ import {
 } from '../components/ui/Table';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getInventoryRisks, getDemandForecast } from '../services/api';
+import { useDatasetSync } from '../services/dataSync';
 import type { RiskAnalysisItem, RiskAnalysisResponse, ForecastResponse } from '../types/api';
 
 export const RiskDemandPage: React.FC = () => {
@@ -47,6 +48,10 @@ export const RiskDemandPage: React.FC = () => {
     }
   };
 
+  const syncInfo = useDatasetSync(['sales', 'inventory', 'products'], () => {
+    fetchData(parseInt(selectedHorizon, 10));
+  });
+
   useEffect(() => {
     fetchData(parseInt(selectedHorizon, 10));
   }, [selectedHorizon]);
@@ -73,6 +78,11 @@ export const RiskDemandPage: React.FC = () => {
               Risk & Demand Intelligence
             </h1>
             <Badge variant="primary" size="sm">Phase 3 Live Models</Badge>
+            {syncInfo.formattedSyncTime && (
+              <Badge variant="neutral" size="sm">
+                Synced {syncInfo.formattedSyncTime} ({syncInfo.dataset})
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-[#667085]">
             Forecast SKU consumption, evaluate days of cover, and isolate impending stockouts.

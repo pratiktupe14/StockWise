@@ -4,9 +4,13 @@
   "private": true,
   "description": "StockWise FMCG Distribution Intelligence & Optimization",
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
+    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "node scripts/start-backend.mjs",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
   }
 }

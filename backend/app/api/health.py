@@ -1,10 +1,19 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, status
+import json
+from fastapi import APIRouter, status, Response
 from app.core.config import settings
 from app.core.database import check_database_connection
-from app.schemas.health import HealthResponse, DatabaseHealth
+from app.schemas.health import (
+    HealthResponse,
+    DatabaseHealth,
+    SystemValidationReport,
+)
+from app.services.system_validation_service import (
+    get_latest_system_validation_report,
+    execute_full_system_validation,
+)
 
-router = APIRouter(tags=["Health"])
+router = APIRouter(tags=["Health & Validation"])
 
 
 @router.get(
@@ -12,12 +21,13 @@ router = APIRouter(tags=["Health"])
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
     summary="System and Database Health Check",
-    description="Returns live API status and runs an actual database query to verify connectivity.",
+    description="Returns live API status, database connectivity, and algorithm validation summary.",
 )
 def get_system_health() -> HealthResponse:
     """
     Evaluates backend and database health in real time.
-    Distinguishes API availability from database connectivity.
+    Distinguishes API availability from database connectivity,
+    and includes latest system validation metrics.
     """
     db_check = check_database_connection()
     is_db_connected = db_check["connected"]
@@ -32,6 +42,12 @@ def get_system_health() -> HealthResponse:
 
     overall_status = "healthy" if is_db_connected else "degraded"
 
+    val_report = None
+    try:
+        val_report = get_latest_system_validation_report()
+    except Exception:
+        pass
+
     return HealthResponse(
         status=overall_status,
         app_name=settings.APP_NAME,
@@ -41,6 +57,51 @@ def get_system_health() -> HealthResponse:
         timestamp=datetime.now(timezone.utc).isoformat(),
         api="online",
         database=database_health,
+        validation_summary=val_report,
+    )
+
+
+@router.get(
+    "/system-validation",
+    response_model=SystemValidationReport,
+    status_code=status.HTTP_200_OK,
+    summary="Get Latest System Validation & Test Pass Rate Report",
+    description="Returns verifiable test results across all 16 core distribution intelligence modules.",
+)
+def get_system_validation() -> SystemValidationReport:
+    """Returns the latest persisted system validation report."""
+    return get_latest_system_validation_report()
+
+
+@router.post(
+    "/system-validation/run",
+    response_model=SystemValidationReport,
+    status_code=status.HTTP_200_OK,
+    summary="Run Full System Check & Algorithm Validation",
+    description="Executes all positive, negative, boundary, and failure-case tests live and recalculates scores.",
+)
+def run_system_validation() -> SystemValidationReport:
+    """Executes live verification tests and updates stored report."""
+    return execute_full_system_validation()
+
+
+@router.get(
+    "/system-validation/export",
+    summary="Export System Validation Report",
+    description="Downloads the complete validation evidence and test audit trail as a formatted JSON document.",
+)
+def export_system_validation():
+    """Generates an exportable JSON test report attachment."""
+    report = get_latest_system_validation_report()
+    report_json = report.model_dump_json(indent=2)
+    filename = f"stockwise_validation_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+    return Response(
+        content=report_json,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "no-cache",
+        },
     )
 
 
@@ -52,7 +113,6 @@ def get_system_health() -> HealthResponse:
 def get_readiness():
     db_check = check_database_connection()
     if not db_check["connected"]:
-        from fastapi import Response
         return Response(
             content='{"status": "not_ready", "error": "Database unavailable"}',
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
